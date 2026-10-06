@@ -1,0 +1,14 @@
+# Credenciales
+.env
+**/.env
+
+# Node
+node_modules/
+**/node_modules/
+npm-debug.log*
+*.log
+
+# VS Code / sistema
+.vscode/
+.DS_Store
+Thumbs.db
