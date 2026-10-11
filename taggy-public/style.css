@@ -1,0 +1,563 @@
+/* =========================
+   TAGGY - PERFIL DE MASCOTA
+   CSS MODERNO
+========================= */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+    color: #172033;
+
+    background:
+        radial-gradient(circle at top left, rgba(33, 150, 243, 0.13), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(21, 101, 192, 0.10), transparent 30%),
+        #f5f8fc;
+}
+
+/* CONTENEDOR PRINCIPAL */
+
+.contenedor {
+    width: 100%;
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 38px 20px 25px;
+}
+
+/* LOGO */
+
+.logo {
+    text-align: center;
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    margin-bottom: 25px;
+
+    background: linear-gradient(
+        135deg,
+        #0d47a1,
+        #1976d2,
+        #42a5f5
+    );
+
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* TARJETA */
+
+.tarjeta {
+    position: relative;
+
+    background: rgba(255, 255, 255, 0.96);
+
+    border: 1px solid rgba(21, 101, 192, 0.08);
+    border-radius: 28px;
+
+    padding: 34px 28px;
+
+    box-shadow:
+        0 20px 50px rgba(30, 64, 175, 0.10),
+        0 5px 15px rgba(0, 0, 0, 0.04);
+
+    transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+}
+
+.tarjeta:hover {
+    transform: translateY(-3px);
+
+    box-shadow:
+        0 25px 60px rgba(30, 64, 175, 0.14),
+        0 8px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* FOTO DE MASCOTA */
+
+.foto {
+    width: 125px;
+    height: 125px;
+
+    margin: 0 auto 18px;
+
+    border-radius: 50%;
+
+    background:
+        linear-gradient(
+            145deg,
+            #e3f2fd,
+            #bbdefb
+        );
+
+    border: 6px solid #ffffff;
+
+    box-shadow:
+        0 10px 30px rgba(21, 101, 192, 0.18);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 54px;
+
+    transition: transform 0.25s ease;
+}
+
+.foto:hover {
+    transform: scale(1.04);
+}
+
+/* NOMBRE */
+
+h1 {
+    text-align: center;
+
+    margin: 0 0 8px;
+
+    font-size: 32px;
+    font-weight: 800;
+
+    color: #111827;
+}
+
+/* TIPO DE MASCOTA */
+
+#tipoMascota {
+    margin: 0;
+
+    text-align: center;
+
+    color: #64748b;
+
+    font-size: 16px;
+}
+
+/* ALERTA MASCOTA EXTRAVIADA */
+
+.alerta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin: 24px 0;
+
+    padding: 14px 16px;
+
+    border-radius: 14px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #fff1f2,
+            #ffe4e6
+        );
+
+    border: 1px solid #fecdd3;
+
+    color: #be123c;
+
+    font-size: 15px;
+    font-weight: 800;
+
+    box-shadow:
+        0 6px 18px rgba(225, 29, 72, 0.08);
+}
+
+/* ELEMENTOS OCULTOS */
+
+.oculto {
+    display: none !important;
+}
+
+/* DATOS */
+
+.datos {
+    margin-top: 24px;
+
+    background: #f8fafc;
+
+    border-radius: 18px;
+
+    padding: 4px 18px;
+
+    border: 1px solid #edf2f7;
+}
+
+.datos p {
+    margin: 0;
+
+    padding: 16px 0;
+
+    border-bottom: 1px solid #e7edf5;
+
+    line-height: 1.5;
+
+    color: #475569;
+}
+
+.datos p:last-child {
+    border-bottom: none;
+}
+
+.datos strong {
+    color: #162033;
+    font-weight: 700;
+}
+
+/* CONTACTO */
+
+.contacto {
+    margin-top: 28px;
+}
+
+.contacto h2 {
+    margin-bottom: 16px;
+
+    font-size: 23px;
+
+    color: #111827;
+}
+
+.contacto p {
+    color: #64748b;
+}
+
+/* BOTONES */
+
+.boton {
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 15px 20px;
+
+    border: none;
+    border-radius: 14px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #1565c0,
+            #1976d2
+        );
+
+    color: white;
+
+    text-decoration: none;
+
+    font-size: 16px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 8px 20px rgba(21, 101, 192, 0.20);
+
+    transition:
+        transform 0.20s ease,
+        box-shadow 0.20s ease,
+        filter 0.20s ease;
+}
+
+.boton:hover {
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 12px 26px rgba(21, 101, 192, 0.28);
+
+    filter: brightness(1.04);
+}
+
+.boton:active {
+    transform: scale(0.98);
+}
+
+/* AVISTAMIENTO */
+
+.avistamiento {
+    margin-top: 14px;
+}
+
+/* BOTÓN SECUNDARIO */
+
+.boton-secundario {
+    width: 100%;
+
+    padding: 14px 18px;
+
+    border-radius: 14px;
+
+    border: 2px solid #1976d2;
+
+    background: #ffffff;
+
+    color: #1565c0;
+
+    font-size: 15px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.boton-secundario:hover {
+    background: #eaf4ff;
+
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 8px 18px rgba(21, 101, 192, 0.12);
+}
+
+/* FORMULARIO DE AVISTAMIENTO */
+
+.form-avistamiento {
+    margin-top: 24px;
+
+    padding: 24px;
+
+    border-radius: 18px;
+
+    background: #f8fafc;
+
+    border: 1px solid #e7edf5;
+
+    animation: aparecer 0.3s ease;
+}
+
+@keyframes aparecer {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.form-avistamiento label {
+    display: block;
+
+    margin-top: 16px;
+    margin-bottom: 7px;
+
+    color: #334155;
+
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.form-avistamiento label:first-child {
+    margin-top: 0;
+}
+
+.form-avistamiento input,
+.form-avistamiento textarea {
+    width: 100%;
+
+    padding: 13px 14px;
+
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+
+    background: white;
+
+    color: #1e293b;
+
+    font-size: 15px;
+
+    font-family: inherit;
+
+    outline: none;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.form-avistamiento input:focus,
+.form-avistamiento textarea:focus {
+    border-color: #1976d2;
+
+    box-shadow:
+        0 0 0 4px rgba(25, 118, 210, 0.10);
+}
+
+.form-avistamiento textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+/* TEXTO AYUDA */
+
+.texto-ayuda {
+    margin-top: 8px;
+
+    color: #64748b;
+
+    font-size: 14px;
+
+    line-height: 1.6;
+}
+
+/* BOTÓN UBICACIÓN */
+
+.boton-ubicacion {
+    width: 100%;
+
+    margin-top: 16px;
+
+    padding: 14px;
+
+    border: none;
+    border-radius: 13px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #263238,
+            #455a64
+        );
+
+    color: white;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.boton-ubicacion:hover {
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 10px 22px rgba(38, 50, 56, 0.20);
+}
+
+/* ESTADO UBICACIÓN */
+
+#estadoUbicacion {
+    margin-top: 10px;
+
+    font-size: 13px;
+
+    color: #64748b;
+}
+
+/* RESULTADO */
+
+#resultadoAvistamiento {
+    margin-top: 18px;
+
+    padding: 10px;
+
+    border-radius: 10px;
+
+    text-align: center;
+
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* FOOTER */
+
+.footer {
+    text-align: center;
+
+    margin-top: 22px;
+
+    color: #94a3b8;
+
+    font-size: 13px;
+
+    letter-spacing: 0.2px;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 600px) {
+
+    .contenedor {
+        padding: 25px 14px 20px;
+    }
+
+    .logo {
+        font-size: 34px;
+        margin-bottom: 18px;
+    }
+
+    .tarjeta {
+        padding: 28px 20px;
+
+        border-radius: 24px;
+    }
+
+    .foto {
+        width: 105px;
+        height: 105px;
+
+        font-size: 46px;
+    }
+
+    h1 {
+        font-size: 28px;
+    }
+
+    #tipoMascota {
+        font-size: 15px;
+    }
+
+    .datos {
+        padding: 4px 15px;
+    }
+
+    .form-avistamiento {
+        padding: 18px;
+    }
+}
+
+@media (max-width: 380px) {
+
+    .contenedor {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .tarjeta {
+        padding: 24px 16px;
+    }
+
+    .logo {
+        font-size: 30px;
+    }
+
+    h1 {
+        font-size: 26px;
+    }
+}

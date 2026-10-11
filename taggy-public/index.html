@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>TAGGY - Perfil de mascota</title>
+
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+    <main class="contenedor">
+
+        <div class="logo">
+            TAGGY
+        </div>
+
+        <section class="tarjeta">
+
+            <div class="foto">
+                🐾
+            </div>
+
+            <h1 id="nombreMascota">
+                Cargando...
+            </h1>
+
+            <p id="tipoMascota"></p>
+
+            <div
+                id="alertaExtravio"
+                class="alerta oculto"
+            >
+                🚨 MASCOTA EXTRAVIADA
+            </div>
+
+            <div class="datos">
+
+                <p>
+                    <strong>Sexo:</strong>
+                    <span id="sexo"></span>
+                </p>
+
+                <p>
+                    <strong>Color:</strong>
+                    <span id="color"></span>
+                </p>
+
+                <p>
+                    <strong>Señas particulares:</strong>
+                    <span id="senas"></span>
+                </p>
+
+            </div>
+
+            <div class="contacto">
+
+                <h2>Contacto</h2>
+
+                <p id="propietario"></p>
+
+                <a
+                    id="telefono"
+                    class="boton"
+                    href="#"
+                >
+                    📞 Contactar propietario
+                </a>
+
+            </div>
+            <div class="avistamiento">
+
+    <button
+        id="btnMostrarAvistamiento"
+        class="boton boton-secundario"
+        type="button"
+    >
+        📍 Reportar avistamiento
+    </button>
+
+    <form
+        id="formAvistamiento"
+        class="form-avistamiento oculto"
+    >
+
+        <h2>Reportar avistamiento</h2>
+
+        <p class="texto-ayuda">
+            Si viste a esta mascota, puedes enviar información al propietario.
+        </p>
+
+        <label for="nombreReportante">
+            Tu nombre
+        </label>
+
+        <input
+            type="text"
+            id="nombreReportante"
+            placeholder="Opcional"
+        >
+
+        <label for="telefonoReportante">
+            Tu teléfono
+        </label>
+
+        <input
+            type="tel"
+            id="telefonoReportante"
+            placeholder="Opcional"
+        >
+
+        <label for="mensajeAvistamiento">
+            ¿Dónde la viste?
+        </label>
+
+        <textarea
+            id="mensajeAvistamiento"
+            rows="4"
+            placeholder="Ej. La vi cerca del parque..."
+        ></textarea>
+
+        <button
+            id="btnUbicacion"
+            class="boton boton-ubicacion"
+            type="button"
+        >
+            📍 Usar mi ubicación actual
+        </button>
+
+        <p id="estadoUbicacion"></p>
+
+        <button
+            class="boton"
+            type="submit"
+        >
+            Enviar avistamiento
+        </button>
+
+        <p id="resultadoAvistamiento"></p>
+
+    </form>
+
+</div>
+
+        </section>
+
+
+        <p class="footer">
+            Identificación inteligente TAGGY
+        </p>
+
+    </main>
+
+    <script src="/app.js"></script>
+
+</body>
+</html>
