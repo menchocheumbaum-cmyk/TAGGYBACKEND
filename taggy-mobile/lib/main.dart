@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -38,7 +39,9 @@ class TaggyColors {
 // ======================================================
 
 class Mascota {
+  int? id;
   String nombre;
+  String especie;
   String raza;
   String edad;
   String sexo;
@@ -49,19 +52,23 @@ class Mascota {
   String? imagenPath;
 
   Mascota({
-  required this.nombre,
-  required this.raza,
-  required this.edad,
-  required this.sexo,
-  required this.color,
-  required this.peso,
-  required this.idTaggy,
-  this.extraviada = false,
-  this.imagenPath,
-});
+    this.id,
+    required this.nombre,
+    required this.especie,
+    required this.raza,
+    required this.edad,
+    required this.sexo,
+    required this.color,
+    required this.peso,
+    required this.idTaggy,
+    this.extraviada = false,
+    this.imagenPath,
+  });
 
   Mascota copyWith({
+    int? id,
     String? nombre,
+    String? especie,
     String? raza,
     String? edad,
     String? sexo,
@@ -72,21 +79,25 @@ class Mascota {
     String? imagenPath,
   }) {
     return Mascota(
-    nombre: nombre ?? this.nombre,
-    raza: raza ?? this.raza,
-    edad: edad ?? this.edad,
-    sexo: sexo ?? this.sexo,
-    color: color ?? this.color,
-    peso: peso ?? this.peso,
-    idTaggy: idTaggy ?? this.idTaggy,
-    extraviada: extraviada ?? this.extraviada,
-    imagenPath: imagenPath ?? this.imagenPath,
-  );
-}
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      especie: especie ?? this.especie,
+      raza: raza ?? this.raza,
+      edad: edad ?? this.edad,
+      sexo: sexo ?? this.sexo,
+      color: color ?? this.color,
+      peso: peso ?? this.peso,
+      idTaggy: idTaggy ?? this.idTaggy,
+      extraviada: extraviada ?? this.extraviada,
+      imagenPath: imagenPath ?? this.imagenPath,
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'nombre': nombre,
+      'especie': especie,
       'raza': raza,
       'edad': edad,
       'sexo': sexo,
@@ -98,32 +109,35 @@ class Mascota {
     };
   }
 
-factory Mascota.fromJson(Map<String, dynamic> json) {
-  return Mascota(
-    nombre: json['nombre']?.toString() ?? '',
-    raza: json['raza']?.toString() ?? '',
-    edad: json['edad']?.toString() ?? '',
-    sexo: json['sexo']?.toString() ?? '',
-    color: json['color']?.toString() ?? '',
-    peso: json['peso']?.toString() ?? '',
+  factory Mascota.fromJson(Map<String, dynamic> json) {
+    final rawId = json['id'];
+    final id = rawId is int
+        ? rawId
+        : int.tryParse(rawId?.toString() ?? '');
 
-    idTaggy:
-        json['device_uid']?.toString() ??
-        'TAGGY-${json['id'] ?? ''}',
-
-    extraviada:
-        json['modo_extravio'] == true ||
-        json['extraviada'] == true,
-
-    // Por ahora no usamos foto_url aquí.
-    // Lo conectaremos después con el servidor.
-    imagenPath: json['imagenPath']?.toString(),
-  );
+    return Mascota(
+      id: id,
+      nombre: json['nombre']?.toString() ?? '',
+      especie: json['especie']?.toString() ?? 'Perro',
+      raza: json['raza']?.toString() ?? '',
+      edad: json['edad']?.toString() ?? '',
+      sexo: json['sexo']?.toString() ?? '',
+      color: json['color']?.toString() ?? '',
+      peso: json['peso']?.toString() ?? '',
+      idTaggy:
+          json['device_uid']?.toString() ??
+          json['idTaggy']?.toString() ??
+          'TAGGY-${json['id'] ?? ''}',
+      extraviada:
+          json['modo_extravio'] == true ||
+          json['extraviada'] == true,
+      imagenPath: json['imagenPath']?.toString(),
+    );
+  }
 }
-}
-
 
 // ======================================================
+// FOTOS DE MASCOTAS// ======================================================
 // FOTOS DE MASCOTAS
 // ======================================================
 
@@ -698,89 +712,76 @@ class _RegistroPageState
       TextEditingController();
 
   Future<void> crearCuenta() async {
-  final nombre = nombreController.text.trim();
-  final correo = correoController.text.trim();
-  final telefono = telefonoController.text.trim();
-  final password = passwordController.text;
-  final confirmar = confirmarController.text;
+    final nombre = nombreController.text.trim();
+    final correo = correoController.text.trim();
+    final telefono = telefonoController.text.trim();
+    final password = passwordController.text;
+    final confirmar = confirmarController.text;
 
-  if (nombre.isEmpty ||
-      correo.isEmpty ||
-      telefono.isEmpty ||
-      password.isEmpty ||
-      confirmar.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Completa todos los campos.',
+    if (nombre.isEmpty ||
+        correo.isEmpty ||
+        telefono.isEmpty ||
+        password.isEmpty ||
+        confirmar.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Completa todos los campos.'),
         ),
-      ),
-    );
+      );
+      return;
+    }
 
-    return;
+    if (password != confirmar) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Las contraseñas no coinciden.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await ApiService.registrarUsuario(
+        nombre: nombre,
+        email: correo,
+        password: password,
+        telefono: telefono,
+      );
+
+      await ApiService.login(
+        email: correo,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cuenta creada correctamente'),
+        ),
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const HomePage(),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
   }
 
-  if (password != confirmar) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Las contraseñas no coinciden.',
-        ),
-      ),
-    );
-
-    return;
-  }
-
-  try {
-    await ApiService.registrarUsuario(
-      nombre: nombre,
-      email: correo,
-      password: password,
-      telefono: telefono,
-    );
-
-    // Después de crear la cuenta, inicia sesión automáticamente
-    await ApiService.login(
-      email: correo,
-      password: password,
-    );
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Cuenta creada correctamente',
-        ),
-      ),
-    );
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const HomePage(),
-      ),
-      (route) => false,
-    );
-  } catch (e) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          e.toString().replaceFirst(
-                'Exception: ',
-                '',
-              ),
-        ),
-      ),
-    );
-  }
-}
-  
-
-  @override
+    @override
   void dispose() {
     nombreController.dispose();
     correoController.dispose();
@@ -912,7 +913,6 @@ class HomePage extends StatefulWidget {
 
   @override
   State<HomePage> createState() => _HomePageState();
-  
 }
 
 class _HomePageState extends State<HomePage> {
@@ -932,6 +932,7 @@ class _HomePageState extends State<HomePage> {
   Mascota get mascotaInicial {
     return Mascota(
       nombre: 'Max',
+      especie: 'Perro',
       raza: 'Labrador',
       edad: '3 años',
       sexo: 'Macho',
@@ -942,52 +943,82 @@ class _HomePageState extends State<HomePage> {
   }
 
 Future<void> cargarMascotas() async {
-  try {
-    final lista = await ApiService.obtenerMascotas();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final datosLocales = prefs.getString(storageKey);
 
-    mascotas = lista.map((item) {
-      return Mascota.fromJson(
-        Map<String, dynamic>.from(item),
+      final Map<int, Mascota> localesPorId = {};
+
+      if (datosLocales != null && datosLocales.isNotEmpty) {
+        try {
+          final listaLocal = jsonDecode(datosLocales) as List<dynamic>;
+          for (final item in listaLocal) {
+            final local = Mascota.fromJson(
+              Map<String, dynamic>.from(item),
+            );
+            if (local.id != null) {
+              localesPorId[local.id!] = local;
+            }
+          }
+        } catch (_) {
+          // Ignoramos datos locales antiguos o dañados.
+        }
+      }
+
+      final lista = await ApiService.obtenerMascotas();
+
+      mascotas = lista.map((item) {
+        var remota = Mascota.fromJson(
+          Map<String, dynamic>.from(item),
+        );
+
+        final local =
+            remota.id == null ? null : localesPorId[remota.id!];
+
+        if (local != null) {
+          remota = remota.copyWith(
+            edad: local.edad,
+            peso: local.peso,
+            imagenPath: local.imagenPath,
+          );
+        }
+
+        return remota;
+      }).toList();
+
+      await guardarMascotas();
+
+      debugPrint(
+        'Mascotas recibidas del backend: ${mascotas.length}',
       );
-    }).toList();
+    } catch (e) {
+      debugPrint('ERROR AL CARGAR MASCOTAS: $e');
 
-    debugPrint(
-      'Mascotas recibidas del backend: ${mascotas.length}',
-    );
-  } catch (e) {
-    debugPrint(
-      'ERROR AL CARGAR MASCOTAS: $e',
-    );
-
-    mascotas = [];
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'No se pudieron cargar las mascotas: $e',
+              ),
+            ),
+          );
+        });
+      }
+    }
 
     if (mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'No se pudieron cargar las mascotas: $e',
-            ),
-          ),
-        );
+      setState(() {
+        cargando = false;
       });
     }
   }
-
-  if (mounted) {
-    setState(() {
-      cargando = false;
-    });
-  }
-}
 
   Future<void> guardarMascotas() async {
     final prefs = await SharedPreferences.getInstance();
 
     final datos = mascotas
-        .map(
-          (mascota) => mascota.toJson(),
-        )
+        .map((mascota) => mascota.toJson())
         .toList();
 
     await prefs.setString(
@@ -997,91 +1028,172 @@ Future<void> cargarMascotas() async {
   }
 
   Future<void> agregarMascota(Mascota mascota) async {
-  try {
-    await ApiService.crearMascota(
-      nombre: mascota.nombre,
-      especie: 'Perro',
-      raza: mascota.raza,
-      sexo: mascota.sexo,
-      color: mascota.color,
-    );
-
-    final lista = await ApiService.obtenerMascotas();
-
-    final nuevasMascotas = lista.map((item) {
-      return Mascota.fromJson(
-        Map<String, dynamic>.from(item),
+    try {
+      final data = await ApiService.crearMascota(
+        nombre: mascota.nombre,
+        especie: mascota.especie,
+        raza: mascota.raza,
+        sexo: mascota.sexo,
+        color: mascota.color,
       );
-    }).toList();
 
-    if (!mounted) return;
+      final creada = Mascota.fromJson(data).copyWith(
+        edad: mascota.edad,
+        peso: mascota.peso,
+        imagenPath: mascota.imagenPath,
+      );
 
-    setState(() {
-      mascotas = nuevasMascotas;
-    });
-  } catch (e) {
-    if (!mounted) return;
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          e.toString().replaceFirst(
-            'Exception: ',
-            '',
+      setState(() {
+        mascotas.insert(0, creada);
+      });
+
+      await guardarMascotas();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
           ),
         ),
-      ),
-    );
-
-    rethrow;
+      );
+      rethrow;
+    }
   }
-}
 
   Future<void> editarMascota(
     int index,
     Mascota mascotaActualizada,
   ) async {
-    if (index < 0 || index >= mascotas.length) {
-      return;
+    if (index < 0 || index >= mascotas.length) return;
+
+    final original = mascotas[index];
+
+    if (original.id == null) {
+      throw Exception('La mascota no tiene un ID válido.');
     }
 
-    setState(() {
-      mascotas[index] = mascotaActualizada;
-    });
+    try {
+      final data = await ApiService.editarMascota(
+        id: original.id!,
+        nombre: mascotaActualizada.nombre,
+        especie: mascotaActualizada.especie,
+        raza: mascotaActualizada.raza,
+        sexo: mascotaActualizada.sexo,
+        color: mascotaActualizada.color,
+      );
 
-    await guardarMascotas();
+      final actualizada = Mascota.fromJson(data).copyWith(
+        edad: mascotaActualizada.edad,
+        peso: mascotaActualizada.peso,
+        imagenPath: mascotaActualizada.imagenPath,
+        idTaggy: original.idTaggy,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        mascotas[index] = actualizada;
+      });
+
+      await guardarMascotas();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+      rethrow;
+    }
   }
 
   Future<void> eliminarMascota(int index) async {
-    if (index < 0 || index >= mascotas.length) {
-      return;
+    if (index < 0 || index >= mascotas.length) return;
+
+    final mascota = mascotas[index];
+
+    if (mascota.id == null) {
+      throw Exception('La mascota no tiene un ID válido.');
     }
 
-    setState(() {
-      mascotas.removeAt(index);
-    });
+    try {
+      await ApiService.eliminarMascota(mascota.id!);
 
-    await guardarMascotas();
+      if (!mounted) return;
+
+      setState(() {
+        mascotas.removeAt(index);
+      });
+
+      await guardarMascotas();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+      rethrow;
+    }
   }
 
   Future<void> cambiarEstadoExtravio(
     int index,
     bool extraviada,
   ) async {
-    if (index < 0 || index >= mascotas.length) {
-      return;
+    if (index < 0 || index >= mascotas.length) return;
+
+    final mascota = mascotas[index];
+
+    if (mascota.id == null) {
+      throw Exception('La mascota no tiene un ID válido.');
     }
 
-    setState(() {
-      mascotas[index] = mascotas[index].copyWith(
+    try {
+      final data = await ApiService.cambiarModoExtravio(
+        id: mascota.id!,
         extraviada: extraviada,
       );
-    });
 
-    await guardarMascotas();
+      final actualizada = Mascota.fromJson(data).copyWith(
+        edad: mascota.edad,
+        peso: mascota.peso,
+        imagenPath: mascota.imagenPath,
+        idTaggy: mascota.idTaggy,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        mascotas[index] = actualizada;
+      });
+
+      await guardarMascotas();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+      rethrow;
+    }
   }
 
-  void cambiarPagina(int index) {
+    void cambiarPagina(int index) {
     setState(() {
       paginaActual = index;
     });
@@ -1400,19 +1512,21 @@ class MascotasPage extends StatelessWidget {
       return;
     }
 
-    await onAgregarMascota(nuevaMascota);
+    try {
+      await onAgregarMascota(nuevaMascota);
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          backgroundColor:
-              TaggyColors.surfaceLight,
-          content: Text(
-            '${nuevaMascota.nombre} fue agregada correctamente.',
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: TaggyColors.surfaceLight,
+            content: Text(
+              '${nuevaMascota.nombre} fue agregada correctamente.',
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } catch (_) {
+      // El callback ya muestra el mensaje del backend.
     }
   }
 
@@ -1611,6 +1725,7 @@ class _AgregarMascotaPageState
   final pesoController =
       TextEditingController();
 
+  String especie = 'Perro';
   String sexo = 'Macho';
   String? imagenPath;
 
@@ -1642,6 +1757,7 @@ class _AgregarMascotaPageState
 
     final mascota = Mascota(
       nombre: nombreController.text.trim(),
+      especie: especie,
       raza: razaController.text.trim(),
       edad: edadController.text.trim(),
       sexo: sexo,
@@ -1749,6 +1865,37 @@ class _AgregarMascotaPageState
               label: 'Nombre',
               icono: Icons.pets,
               requerido: true,
+            ),
+
+            const SizedBox(height: 15),
+
+            DropdownButtonFormField<String>(
+              initialValue: especie,
+              decoration: const InputDecoration(
+                labelText: 'Especie',
+                prefixIcon: Icon(Icons.pets),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'Perro',
+                  child: Text('Perro'),
+                ),
+                DropdownMenuItem(
+                  value: 'Gato',
+                  child: Text('Gato'),
+                ),
+                DropdownMenuItem(
+                  value: 'Otro',
+                  child: Text('Otro'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    especie = value;
+                  });
+                }
+              },
             ),
 
             const SizedBox(height: 15),
@@ -1898,12 +2045,16 @@ class _DetalleMascotaPageState
       return;
     }
 
-    await widget.onEditar(actualizada);
+    try {
+      await widget.onEditar(actualizada);
 
-    if (mounted) {
-      setState(() {
-        mascota = actualizada;
-      });
+      if (mounted) {
+        setState(() {
+          mascota = actualizada;
+        });
+      }
+    } catch (_) {
+      // El callback ya muestra el error.
     }
   }
 
@@ -1911,16 +2062,20 @@ class _DetalleMascotaPageState
     final nuevoEstado =
         !mascota.extraviada;
 
-    await widget.onEstadoChanged(
-      nuevoEstado,
-    );
+    try {
+      await widget.onEstadoChanged(
+        nuevoEstado,
+      );
 
-    if (mounted) {
-      setState(() {
-        mascota = mascota.copyWith(
-          extraviada: nuevoEstado,
-        );
-      });
+      if (mounted) {
+        setState(() {
+          mascota = mascota.copyWith(
+            extraviada: nuevoEstado,
+          );
+        });
+      }
+    } catch (_) {
+      // El callback ya muestra el error.
     }
   }
 
@@ -1973,10 +2128,14 @@ class _DetalleMascotaPageState
       return;
     }
 
-    await widget.onEliminar();
+    try {
+      await widget.onEliminar();
 
-    if (mounted) {
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (_) {
+      // El callback ya muestra el error.
     }
   }
 
@@ -2158,6 +2317,7 @@ class _EditarMascotaPageState
   late TextEditingController colorController;
   late TextEditingController pesoController;
 
+  late String especie;
   late String sexo;
   String? imagenPath;
 
@@ -2190,6 +2350,10 @@ class _EditarMascotaPageState
       text: widget.mascota.peso,
     );
 
+    especie = widget.mascota.especie.isEmpty
+        ? 'Perro'
+        : widget.mascota.especie;
+
     sexo = widget.mascota.sexo == 'Hembra'
         ? 'Hembra'
         : 'Macho';
@@ -2218,6 +2382,7 @@ class _EditarMascotaPageState
     final actualizada =
         widget.mascota.copyWith(
       nombre: nombreController.text.trim(),
+      especie: especie,
       raza: razaController.text.trim(),
       edad: edadController.text.trim(),
       sexo: sexo,
@@ -2316,6 +2481,37 @@ class _EditarMascotaPageState
               label: 'Nombre',
               icono: Icons.pets,
               requerido: true,
+            ),
+
+            const SizedBox(height: 15),
+
+            DropdownButtonFormField<String>(
+              initialValue: especie,
+              decoration: const InputDecoration(
+                labelText: 'Especie',
+                prefixIcon: Icon(Icons.pets),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'Perro',
+                  child: Text('Perro'),
+                ),
+                DropdownMenuItem(
+                  value: 'Gato',
+                  child: Text('Gato'),
+                ),
+                DropdownMenuItem(
+                  value: 'Otro',
+                  child: Text('Otro'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    especie = value;
+                  });
+                }
+              },
             ),
 
             const SizedBox(height: 15),
@@ -2692,15 +2888,61 @@ class AlertasPage extends StatelessWidget {
 // PERFIL
 // ======================================================
 
-class PerfilPage extends StatelessWidget {
+class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key});
-    Future<void> cerrarSesion(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setBool('taggy_logged_in', false);
-    await prefs.remove('taggy_token');
+  @override
+  State<PerfilPage> createState() => _PerfilPageState();
+}
 
-    if (!context.mounted) return;
+class _PerfilPageState extends State<PerfilPage> {
+  bool cargando = true;
+
+  String nombre = '';
+  String apellido = '';
+  String correo = '';
+  String telefono = '';
+
+  @override
+  void initState() {
+    super.initState();
+    cargarPerfil();
+  }
+
+  Future<void> cargarPerfil() async {
+    try {
+      final usuario = await ApiService.obtenerPerfil();
+
+      if (!mounted) return;
+
+      setState(() {
+        nombre = usuario['nombre']?.toString() ?? '';
+        apellido = usuario['apellido']?.toString() ?? '';
+        correo = usuario['email']?.toString() ?? '';
+        telefono = usuario['telefono']?.toString() ?? '';
+        cargando = false;
+      });
+    } catch (e) {
+      final prefs = await SharedPreferences.getInstance();
+
+      if (!mounted) return;
+
+      setState(() {
+        nombre = prefs.getString('taggy_user_name') ?? '';
+        apellido = prefs.getString('taggy_user_lastname') ?? '';
+        correo = prefs.getString('taggy_user_email') ?? '';
+        telefono = prefs.getString('taggy_user_phone') ?? '';
+        cargando = false;
+      });
+
+      debugPrint('ERROR PERFIL: $e');
+    }
+  }
+
+  Future<void> cerrarSesion() async {
+    await ApiService.logout();
+
+    if (!mounted) return;
 
     Navigator.pushAndRemoveUntil(
       context,
@@ -2713,121 +2955,123 @@ class PerfilPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (cargando) {
+      return const SafeArea(
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final nombreCompleto = '$nombre $apellido'.trim();
+
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const TaggyLogo(),
-
-          const SizedBox(height: 25),
-
-          const Text(
-            'Mi perfil',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+      child: RefreshIndicator(
+        onRefresh: cargarPerfil,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          children: [
+            const TaggyLogo(),
+            const SizedBox(height: 25),
+            const Text(
+              'Mi perfil',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-
-          const SizedBox(height: 25),
-
-          Center(
-            child: Container(
-              width: 110,
-              height: 110,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient:
-                    const LinearGradient(
-                  colors: [
-                    TaggyColors.blue,
-                    TaggyColors.cyan,
+            const SizedBox(height: 25),
+            Center(
+              child: Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [
+                      TaggyColors.blue,
+                      TaggyColors.cyan,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: TaggyColors.blue.withOpacity(0.25),
+                      blurRadius: 25,
+                    ),
                   ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: TaggyColors.blue
-                        .withOpacity(0.25),
-                    blurRadius: 25,
+                child: const Icon(
+                  Icons.person,
+                  size: 60,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Center(
+              child: Text(
+                nombreCompleto.isEmpty
+                    ? 'Usuario TAGGY'
+                    : nombreCompleto,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+            InfoCard(
+              icono: Icons.email_outlined,
+              titulo: 'Correo',
+              valor: correo.isEmpty ? 'Sin correo' : correo,
+            ),
+            InfoCard(
+              icono: Icons.phone_outlined,
+              titulo: 'Teléfono',
+              valor: telefono.isEmpty ? 'Sin teléfono' : telefono,
+            ),
+            const InfoCard(
+              icono: Icons.notifications_outlined,
+              titulo: 'Notificaciones',
+              valor: 'Activadas',
+            ),
+            const InfoCard(
+              icono: Icons.security_outlined,
+              titulo: 'Seguridad',
+              valor: 'Protección activa',
+            ),
+            const SizedBox(height: 25),
+            SizedBox(
+              height: 54,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: TaggyColors.red,
+                  side: const BorderSide(
+                    color: TaggyColors.red,
                   ),
-                ],
-              ),
-              child: const Icon(
-                Icons.person,
-                size: 60,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          const Center(
-            child: Text(
-              'Joshua Alejandro',
-              style: TextStyle(
-                fontSize: 23,
-                fontWeight:
-                    FontWeight.bold,
+                ),
+                onPressed: cerrarSesion,
+                icon: const Icon(Icons.logout),
+                label: const Text(
+                  'Cerrar sesión',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
-          ),
-
-          const SizedBox(height: 30),
-
-          const InfoCard(
-            icono: Icons.email_outlined,
-            titulo: 'Correo',
-            valor: 'usuario@taggy.mx',
-          ),
-
-          const InfoCard(
-            icono: Icons.phone_outlined,
-            titulo: 'Teléfono',
-            valor: '33 0000 0000',
-          ),
-
-          const InfoCard(
-            icono:
-                Icons.notifications_outlined,
-            titulo: 'Notificaciones',
-            valor: 'Activadas',
-          ),
-
-          const InfoCard(
-            icono:
-                Icons.security_outlined,
-            titulo: 'Seguridad',
-            valor: 'Protección activa',
-          ),
-          const SizedBox(height: 25),
-
-SizedBox(
-  height: 54,
-  child: OutlinedButton.icon(
-    style: OutlinedButton.styleFrom(
-      foregroundColor: TaggyColors.red,
-      side: const BorderSide(
-        color: TaggyColors.red,
+            const SizedBox(height: 25),
+          ],
+        ),
       ),
-    ),
-    onPressed: () => cerrarSesion(context),
-    icon: const Icon(Icons.logout),
-    label: const Text(
-      'Cerrar sesión',
-      style: TextStyle(
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
-),
-        ],
-      ),
-      
     );
   }
 }
 
 // ======================================================
+// EXTRAVÍO// ======================================================
 // EXTRAVÍO
 // ======================================================
 
@@ -2864,14 +3108,18 @@ class _ExtravioPageState
   Future<void> cambiarEstado() async {
     final nuevoEstado = !extraviada;
 
-    await widget.onEstadoChanged(
-      nuevoEstado,
-    );
+    try {
+      await widget.onEstadoChanged(
+        nuevoEstado,
+      );
 
-    if (mounted) {
-      setState(() {
-        extraviada = nuevoEstado;
-      });
+      if (mounted) {
+        setState(() {
+          extraviada = nuevoEstado;
+        });
+      }
+    } catch (_) {
+      // El callback ya muestra el error.
     }
   }
 
@@ -2971,7 +3219,7 @@ class _ExtravioPageState
 // QR
 // ======================================================
 
-class QrPage extends StatelessWidget {
+class QrPage extends StatefulWidget {
   final Mascota mascota;
 
   const QrPage({
@@ -2980,87 +3228,195 @@ class QrPage extends StatelessWidget {
   });
 
   @override
+  State<QrPage> createState() => _QrPageState();
+}
+
+class _QrPageState extends State<QrPage> {
+  bool cargando = true;
+  String? token;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    cargarQr();
+  }
+
+  Future<void> cargarQr() async {
+    if (widget.mascota.id == null) {
+      setState(() {
+        cargando = false;
+        error = 'La mascota todavía no tiene un ID válido.';
+      });
+      return;
+    }
+
+    try {
+      final valor = await ApiService.generarQr(
+        widget.mascota.id!,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        token = valor;
+        cargando = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        error = e.toString().replaceFirst('Exception: ', '');
+        cargando = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final urlPublica = token == null
+        ? null
+        : '${ApiService.baseUrl}/p/$token';
+
+    final urlQr = token == null
+        ? null
+        : '${ApiService.baseUrl}/api/public/qr/$token.png';
+
     return Scaffold(
-      appBar:
-          AppBar(title: const Text('Código QR')),
+      appBar: AppBar(
+        title: const Text('Código QR'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(25),
         children: [
           const SizedBox(height: 20),
-
-          Container(
-            padding:
-                const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius:
-                  BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: TaggyColors.blue
-                      .withOpacity(0.25),
-                  blurRadius: 30,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.qr_code_2,
-              color: Colors.black,
-              size: 230,
-            ),
-          ),
-
-          const SizedBox(height: 25),
-
-          Center(
-            child: Text(
-              mascota.nombre,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight:
-                    FontWeight.bold,
+          if (cargando)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(60),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (error != null)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: TaggyColors.red.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: TaggyColors.red,
+                    size: 50,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    error!,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15),
+                  FilledButton(
+                    onPressed: () {
+                      setState(() {
+                        cargando = true;
+                        error = null;
+                      });
+                      cargarQr();
+                    },
+                    child: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: TaggyColors.blue.withOpacity(0.25),
+                    blurRadius: 30,
+                  ),
+                ],
+              ),
+              child: Image.network(
+                urlQr!,
+                width: 230,
+                height: 230,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) {
+                  return const Icon(
+                    Icons.qr_code_2,
+                    color: Colors.black,
+                    size: 230,
+                  );
+                },
               ),
             ),
-          ),
-
-          const SizedBox(height: 5),
-
-          Center(
-            child: Text(
-              mascota.idTaggy,
+            const SizedBox(height: 25),
+            Center(
+              child: Text(
+                widget.mascota.nombre,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SelectableText(
+              urlPublica!,
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 color: TaggyColors.cyan,
-                fontWeight:
-                    FontWeight.w600,
               ),
             ),
-          ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 53,
+              child: FilledButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(
+                    ClipboardData(text: urlPublica!),
+                  );
 
-          const SizedBox(height: 30),
+                  if (!context.mounted) return;
 
-          SizedBox(
-            height: 53,
-            child: FilledButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        PerfilPublicoPage(
-                      mascota: mascota,
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Enlace público copiado',
+                      ),
                     ),
-                  ),
-                );
-              },
-              icon: const Icon(
-                Icons.public,
-              ),
-              label: const Text(
-                'Ver perfil público',
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copiar enlace público'),
               ),
             ),
-          ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 53,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PerfilPublicoPage(
+                        mascota: widget.mascota,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.public),
+                label: const Text('Vista previa del perfil'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -3068,6 +3424,7 @@ class QrPage extends StatelessWidget {
 }
 
 // ======================================================
+// PERFIL PÚBLICO// ======================================================
 // PERFIL PÚBLICO
 // ======================================================
 
