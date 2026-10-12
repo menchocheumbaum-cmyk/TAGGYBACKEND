@@ -373,4 +373,36 @@ class ApiService {
 
     throw Exception('El servidor no devolvió el token del QR');
   }
+
+  // =====================================================
+  // EVENTOS / ALERTAS DE UNA MASCOTA
+  // =====================================================
+
+  static Future<List<Map<String, dynamic>>> obtenerEventosMascota(
+    int mascotaId,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/mascotas/$mascotaId/eventos'),
+      headers: await _headers(),
+    );
+
+    final data = _decode(response);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        _mensajeError(data, 'No se pudieron cargar las alertas'),
+      );
+    }
+
+    if (data is Map && data['eventos'] is List) {
+      return (data['eventos'] as List)
+          .map(
+            (item) => Map<String, dynamic>.from(item as Map),
+          )
+          .toList();
+    }
+
+    return <Map<String, dynamic>>[];
+  }
+
 }

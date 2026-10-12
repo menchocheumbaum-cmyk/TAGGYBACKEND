@@ -2784,7 +2784,25 @@ class UbicacionPage extends StatelessWidget {
 // ALERTAS
 // ======================================================
 
-class AlertasPage extends StatelessWidget {
+class _TaggyAlerta {
+  final String tipo;
+  final String titulo;
+  final String descripcion;
+  final DateTime fecha;
+  final IconData icono;
+  final Color color;
+
+  const _TaggyAlerta({
+    required this.tipo,
+    required this.titulo,
+    required this.descripcion,
+    required this.fecha,
+    required this.icono,
+    required this.color,
+  });
+}
+
+class AlertasPage extends StatefulWidget {
   final List<Mascota> mascotas;
 
   const AlertasPage({
@@ -2793,92 +2811,410 @@ class AlertasPage extends StatelessWidget {
   });
 
   @override
+  State<AlertasPage> createState() => _AlertasPageState();
+}
+
+class _AlertasPageState extends State<AlertasPage> {
+  bool cargando = true;
+  String? error;
+  List<_TaggyAlerta> alertas = [];
+
+  @override
+  void initState() {
+    super.initState();
+    cargarAlertas();
+  }
+
+  @override
+  void didUpdateWidget(covariant AlertasPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final idsAnteriores = oldWidget.mascotas
+        .map((mascota) => mascota.id)
+        .whereType<int>()
+        .join(',');
+
+    final idsActuales = widget.mascotas
+        .map((mascota) => mascota.id)
+        .whereType<int>()
+        .join(',');
+
+    if (idsAnteriores != idsActuales) {
+      cargarAlertas();
+    }
+  }
+
+  Future<void> cargarAlertas() async {
+    if (mounted && alertas.isEmpty) {
+      setState(() {
+        cargando = true;
+        error = null;
+      });
+    }
+
+    try {
+      final nuevasAlertas = <_TaggyAlerta>[];
+
+      for (final mascota in widget.mascotas) {
+        if (mascota.id == null) continue;
+
+        final eventos = await ApiService.obtenerEventosMascota(
+          mascota.id!,
+        );
+
+        for (final evento in eventos) {
+          nuevasAlertas.add(
+            _crearAlerta(
+              evento: evento,
+              mascota: mascota,
+            ),
+          );
+        }
+      }
+
+      nuevasAlertas.sort(
+        (a, b) => b.fecha.compareTo(a.fecha),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        alertas = nuevasAlertas;
+        cargando = false;
+        error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        cargando = false;
+        error = e
+            .toString()
+            .replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  _TaggyAlerta _crearAlerta({
+    required Map<String, dynamic> evento,
+    required Mascota mascota,
+  }) {
+    final tipo =
+        evento['tipo']?.toString().toUpperCase() ?? 'EVENTO';
+
+    final descripcionServidor =
+        evento['descripcion']?.toString().trim() ?? '';
+
+    final datosRaw = evento['datos'];
+    final datos = datosRaw is Map
+        ? Map<String, dynamic>.from(datosRaw)
+        : <String, dynamic>{};
+
+    final fecha = _parsearFecha(
+      evento['fecha_evento'] ??
+          evento['fecha_recepcion'],
+    );
+
+    switch (tipo) {
+      case 'QR_SCAN':
+        return _TaggyAlerta(
+          tipo: tipo,
+          titulo: 'Código QR escaneado',
+          descripcion:
+              'Se consultó el perfil público de ${mascota.nombre} mediante su código QR.',
+          fecha: fecha,
+          icono: Icons.qr_code_2_rounded,
+          color: TaggyColors.cyan,
+        );
+
+      case 'AVISTAMIENTO':
+        final nombre =
+            datos['nombre_reportante']?.toString().trim() ?? '';
+
+        final telefono =
+            datos['telefono_reportante']?.toString().trim() ?? '';
+
+        final mensaje =
+            datos['mensaje']?.toString().trim() ?? '';
+
+        final latitud = evento['latitud'];
+        final longitud = evento['longitud'];
+
+        final partes = <String>[];
+
+        partes.add(
+          '${nombre.isEmpty ? 'Alguien' : nombre} reportó un avistamiento de ${mascota.nombre}.',
+        );
+
+        if (telefono.isNotEmpty) {
+          partes.add('Teléfono: $telefono.');
+        }
+
+        if (mensaje.isNotEmpty) {
+          partes.add('Mensaje: $mensaje.');
+        }
+
+        if (latitud != null && longitud != null) {
+          partes.add(
+            'Ubicación: ${latitud.toString()}, ${longitud.toString()}.',
+          );
+        }
+
+        return _TaggyAlerta(
+          tipo: tipo,
+          titulo: 'Avistamiento reportado',
+          descripcion: partes.join(' '),
+          fecha: fecha,
+          icono: Icons.visibility_outlined,
+          color: TaggyColors.orange,
+        );
+
+      case 'MANIPULACION':
+        return _TaggyAlerta(
+          tipo: tipo,
+          titulo: 'Posible manipulación',
+          descripcion: descripcionServidor.isNotEmpty
+              ? descripcionServidor
+              : 'El collar de ${mascota.nombre} detectó una posible manipulación.',
+          fecha: fecha,
+          icono: Icons.shield_outlined,
+          color: TaggyColors.red,
+        );
+
+      case 'BATERIA_BAJA':
+      case 'LOW_BATTERY':
+        return _TaggyAlerta(
+          tipo: tipo,
+          titulo: 'Batería baja',
+          descripcion: descripcionServidor.isNotEmpty
+              ? descripcionServidor
+              : 'El collar de ${mascota.nombre} reportó batería baja.',
+          fecha: fecha,
+          icono: Icons.battery_alert_rounded,
+          color: TaggyColors.orange,
+        );
+
+      case 'UBICACION':
+      case 'LOCATION':
+        return _TaggyAlerta(
+          tipo: tipo,
+          titulo: 'Nueva ubicación',
+          descripcion: descripcionServidor.isNotEmpty
+              ? descripcionServidor
+              : 'Se recibió una nueva ubicación de ${mascota.nombre}.',
+          fecha: fecha,
+          icono: Icons.location_on_outlined,
+          color: TaggyColors.blue,
+        );
+
+      default:
+        return _TaggyAlerta(
+          tipo: tipo,
+          titulo: tipo
+              .replaceAll('_', ' ')
+              .toLowerCase()
+              .split(' ')
+              .where((parte) => parte.isNotEmpty)
+              .map(
+                (parte) =>
+                    '${parte[0].toUpperCase()}${parte.substring(1)}',
+              )
+              .join(' '),
+          descripcion: descripcionServidor.isNotEmpty
+              ? descripcionServidor
+              : 'Se registró actividad de ${mascota.nombre}.',
+          fecha: fecha,
+          icono: Icons.notifications_outlined,
+          color: TaggyColors.blue,
+        );
+    }
+  }
+
+  DateTime _parsearFecha(dynamic valor) {
+    if (valor == null) {
+      return DateTime.now();
+    }
+
+    try {
+      return DateTime.parse(
+        valor.toString(),
+      ).toLocal();
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
+  String _tiempoRelativo(DateTime fecha) {
+    var diferencia = DateTime.now().difference(fecha);
+
+    if (diferencia.isNegative) {
+      diferencia = Duration.zero;
+    }
+
+    if (diferencia.inSeconds < 60) {
+      return 'Ahora';
+    }
+
+    if (diferencia.inMinutes < 60) {
+      return 'Hace ${diferencia.inMinutes} min';
+    }
+
+    if (diferencia.inHours < 24) {
+      return 'Hace ${diferencia.inHours} h';
+    }
+
+    if (diferencia.inDays == 1) {
+      return 'Ayer';
+    }
+
+    if (diferencia.inDays < 7) {
+      return 'Hace ${diferencia.inDays} días';
+    }
+
+    final dia = fecha.day.toString().padLeft(2, '0');
+    final mes = fecha.month.toString().padLeft(2, '0');
+
+    return '$dia/$mes/${fecha.year}';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final algunaExtraviada =
-        mascotas.any(
+    final algunaExtraviada = widget.mascotas.any(
       (mascota) => mascota.extraviada,
     );
 
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const TaggyLogo(),
+      child: RefreshIndicator(
+        onRefresh: cargarAlertas,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          children: [
+            const TaggyLogo(),
 
-          const SizedBox(height: 25),
+            const SizedBox(height: 25),
 
-          const Text(
-            'Alertas',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 5),
-
-          const Text(
-            'Actividad reciente de TAGGY',
-            style: TextStyle(
-              color:
-                  TaggyColors.textSecondary,
-            ),
-          ),
-
-          const SizedBox(height: 22),
-
-          if (algunaExtraviada)
-            const AlertaCard(
-              icono:
-                  Icons.warning_amber_rounded,
-              titulo:
-                  'Modo extravío activo',
-              descripcion:
-                  'Una de tus mascotas está marcada como extraviada.',
-              color: TaggyColors.red,
-              tiempo: 'Ahora',
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Alertas',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Actualizar alertas',
+                  onPressed: cargarAlertas,
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                  ),
+                ),
+              ],
             ),
 
-          const AlertaCard(
-            icono: Icons.qr_code,
-            titulo:
-                'Código QR escaneado',
-            descripcion:
-                'Alguien consultó el perfil público de Max.',
-            color: TaggyColors.cyan,
-            tiempo: 'Hace 5 min',
-          ),
+            const SizedBox(height: 5),
 
-          const AlertaCard(
-            icono: Icons.location_on,
-            titulo:
-                'Nueva ubicación',
-            descripcion:
-                'Se recibió una actualización GPS.',
-            color: TaggyColors.blue,
-            tiempo: 'Hace 12 min',
-          ),
+            const Text(
+              'Actividad real registrada por TAGGY',
+              style: TextStyle(
+                color: TaggyColors.textSecondary,
+              ),
+            ),
 
-          const AlertaCard(
-            icono:
-                Icons.battery_alert,
-            titulo: 'Batería baja',
-            descripcion:
-                'El collar llegó a 15% de batería.',
-            color: TaggyColors.orange,
-            tiempo: 'Ayer',
-          ),
+            const SizedBox(height: 22),
 
-          const AlertaCard(
-            icono: Icons.shield_outlined,
-            titulo:
-                'Posible manipulación',
-            descripcion:
-                'El sensor del collar detectó una apertura.',
-            color: TaggyColors.red,
-            tiempo: 'Ayer',
-          ),
-        ],
+            if (algunaExtraviada)
+              const AlertaCard(
+                icono: Icons.warning_amber_rounded,
+                titulo: 'Modo extravío activo',
+                descripcion:
+                    'Una de tus mascotas está marcada como extraviada.',
+                color: TaggyColors.red,
+                tiempo: 'Ahora',
+              ),
+
+            if (cargando)
+              const Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: 35,
+                ),
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (error != null)
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: TaggyColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.cloud_off_rounded,
+                      size: 38,
+                      color: TaggyColors.orange,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: TaggyColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: cargarAlertas,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              )
+            else if (alertas.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: TaggyColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(
+                      Icons.notifications_none_rounded,
+                      size: 45,
+                      color: TaggyColors.textSecondary,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Todavía no hay actividad registrada.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: TaggyColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...alertas.map(
+                (alerta) => AlertaCard(
+                  icono: alerta.icono,
+                  titulo: alerta.titulo,
+                  descripcion: alerta.descripcion,
+                  color: alerta.color,
+                  tiempo: _tiempoRelativo(alerta.fecha),
+                ),
+              ),
+
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
