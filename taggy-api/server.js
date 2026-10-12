@@ -1,4 +1,4 @@
-const jwt = require("jsonwebtoken");
+﻿const jwt = require("jsonwebtoken");
 
 const bcrypt = require("bcryptjs");
 
@@ -68,7 +68,7 @@ function verificarToken(req, res, next) {
 
     return res.status(401).json({
 
-      mensaje: "Formato de token inválido"
+      mensaje: "Formato de token invÃ¡lido"
 
     });
 
@@ -98,7 +98,7 @@ function verificarToken(req, res, next) {
 
     return res.status(401).json({
 
-      mensaje: "Token inválido o expirado"
+      mensaje: "Token invÃ¡lido o expirado"
 
     });
 
@@ -262,7 +262,7 @@ app.post("/api/usuarios", async (req, res) => {
 
       return res.status(409).json({
 
-        mensaje: "El correo electrónico ya está registrado"
+        mensaje: "El correo electrÃ³nico ya estÃ¡ registrado"
 
       });
 
@@ -338,7 +338,7 @@ app.post("/api/login", async (req, res) => {
 
       return res.status(401).json({
 
-        mensaje: "Correo o contraseña incorrectos"
+        mensaje: "Correo o contraseÃ±a incorrectos"
 
       });
 
@@ -364,7 +364,7 @@ app.post("/api/login", async (req, res) => {
 
       return res.status(401).json({
 
-        mensaje: "Correo o contraseña incorrectos"
+        mensaje: "Correo o contraseÃ±a incorrectos"
 
       });
 
@@ -396,7 +396,7 @@ app.post("/api/login", async (req, res) => {
 
     res.json({
 
-      mensaje: "Inicio de sesión correcto",
+      mensaje: "Inicio de sesiÃ³n correcto",
 
       token: token,
 
@@ -967,6 +967,116 @@ app.delete("/api/mascotas/:id", verificarToken, async (req, res) => {
 
 });
 
+
+// ======================================================
+// MODO EXTRAVÍO POR MASCOTA
+// ======================================================
+
+app.put("/api/mascotas/:id/extravio", verificarToken, async (req, res) => {
+  const client = await db.connect();
+
+  try {
+    const mascotaId = req.params.id;
+    const { extraviada } = req.body;
+
+    if (typeof extraviada !== "boolean") {
+      return res.status(400).json({
+        mensaje: "El campo extraviada debe ser true o false"
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const resultado = await client.query(
+      `
+        UPDATE mascotas
+        SET
+          modo_extravio = $1,
+          fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = $2
+          AND usuario_id = $3
+        RETURNING *
+      `,
+      [
+        extraviada,
+        mascotaId,
+        req.usuario.id
+      ]
+    );
+
+    if (resultado.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        mensaje: "Mascota no encontrada"
+      });
+    }
+
+    await client.query(
+      `
+        UPDATE dispositivos
+        SET
+          modo = $1,
+          fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE mascota_id = $2
+      `,
+      [
+        extraviada ? "extravio" : "normal",
+        mascotaId
+      ]
+    );
+
+    await client.query(
+      `
+        INSERT INTO eventos (
+          mascota_id,
+          tipo,
+          origen,
+          descripcion,
+          datos
+        )
+        VALUES (
+          $1,
+          'MODO_EXTRAVIO',
+          'APP',
+          $2,
+          $3::jsonb
+        )
+      `,
+      [
+        mascotaId,
+        extraviada
+          ? "Se activó el modo extravío desde la aplicación"
+          : "Se desactivó el modo extravío desde la aplicación",
+        JSON.stringify({
+          extraviada
+        })
+      ]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      mensaje: extraviada
+        ? "Modo extravío activado correctamente"
+        : "Modo extravío desactivado correctamente",
+      mascota: resultado.rows[0]
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error("Error al cambiar modo extravío:", error);
+
+    res.status(500).json({
+      mensaje: "Error interno del servidor"
+    });
+
+  } finally {
+    client.release();
+  }
+});
+
 app.post("/api/dispositivos", verificarToken, async (req, res) => {
 
   try {
@@ -1183,7 +1293,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
       return res.status(400).json({
 
-        mensaje: "Latitud inválida"
+        mensaje: "Latitud invÃ¡lida"
 
       });
 
@@ -1195,7 +1305,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
       return res.status(400).json({
 
-        mensaje: "Longitud inválida"
+        mensaje: "Longitud invÃ¡lida"
 
       });
 
@@ -1213,7 +1323,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
       return res.status(400).json({
 
-        mensaje: "Porcentaje de batería inválido"
+        mensaje: "Porcentaje de baterÃ­a invÃ¡lido"
 
       });
 
@@ -1359,7 +1469,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
     res.status(201).json({
 
-      mensaje: "Ubicación recibida correctamente",
+      mensaje: "UbicaciÃ³n recibida correctamente",
 
       device_uid: deviceUid,
 
@@ -1375,7 +1485,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
 
 
-    console.error("Error al recibir ubicación:", error);
+    console.error("Error al recibir ubicaciÃ³n:", error);
 
 
 
@@ -1505,7 +1615,7 @@ app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) =
 
       return res.status(404).json({
 
-        mensaje: "La mascota todavía no tiene ubicaciones registradas"
+        mensaje: "La mascota todavÃ­a no tiene ubicaciones registradas"
 
       });
 
@@ -1563,7 +1673,7 @@ app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) =
 
   } catch (error) {
 
-    console.error("Error al consultar última ubicación:", error);
+    console.error("Error al consultar Ãºltima ubicaciÃ³n:", error);
 
 
 
@@ -1677,7 +1787,7 @@ app.post("/api/device/:deviceUid/event", async (req, res) => {
 
 
 
-    // En mantenimiento no queremos generar falsas alertas de manipulación
+    // En mantenimiento no queremos generar falsas alertas de manipulaciÃ³n
 
     if (
 
@@ -1945,7 +2055,7 @@ app.put("/api/dispositivos/:deviceUid/modo", verificarToken, async (req, res) =>
 
       return res.status(400).json({
 
-        mensaje: "Modo inválido",
+        mensaje: "Modo invÃ¡lido",
 
         modosPermitidos
 
@@ -2049,7 +2159,7 @@ app.put("/api/dispositivos/:deviceUid/modo", verificarToken, async (req, res) =>
 
 
 
-    // Mantenemos sincronizado el estado de extravío de la mascota.
+    // Mantenemos sincronizado el estado de extravÃ­o de la mascota.
 
     await client.query(
 
@@ -2241,7 +2351,7 @@ app.get("/api/device/:deviceUid/config", async (req, res) => {
 
   } catch (error) {
 
-    console.error("Error al consultar configuración:", error);
+    console.error("Error al consultar configuraciÃ³n:", error);
 
 
 
@@ -2335,7 +2445,7 @@ app.post("/api/mascotas/:id/qr", verificarToken, async (req, res) => {
 
 
 
-    // Generar token único
+    // Generar token Ãºnico
 
     const token = crypto.randomUUID();
 
@@ -2479,7 +2589,7 @@ app.get("/api/public/pet/:token", async (req, res) => {
 
       return res.status(404).json({
 
-        mensaje: "QR no válido o desactivado"
+        mensaje: "QR no vÃ¡lido o desactivado"
 
       });
 
@@ -2491,7 +2601,7 @@ app.get("/api/public/pet/:token", async (req, res) => {
 
 
 
-    // Registrar que alguien abrió el perfil mediante QR
+    // Registrar que alguien abriÃ³ el perfil mediante QR
 
     await db.query(
 
@@ -2519,7 +2629,7 @@ app.get("/api/public/pet/:token", async (req, res) => {
 
         'PUBLICO',
 
-        'Se accedió al perfil público mediante código QR',
+        'Se accediÃ³ al perfil pÃºblico mediante cÃ³digo QR',
 
         $2::jsonb
 
@@ -2581,7 +2691,7 @@ app.get("/api/public/pet/:token", async (req, res) => {
 
   } catch (error) {
 
-    console.error("Error en perfil público:", error);
+    console.error("Error en perfil pÃºblico:", error);
 
 
 
@@ -2637,7 +2747,7 @@ app.get("/api/public/qr/:token.png", async (req, res) => {
 
       return res.status(404).json({
 
-        mensaje: "QR no válido o desactivado"
+        mensaje: "QR no vÃ¡lido o desactivado"
 
       });
 
@@ -2775,7 +2885,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
 
       return res.status(400).json({
 
-        mensaje: "Latitud inválida"
+        mensaje: "Latitud invÃ¡lida"
 
       });
 
@@ -2793,7 +2903,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
 
       return res.status(400).json({
 
-        mensaje: "Longitud inválida"
+        mensaje: "Longitud invÃ¡lida"
 
       });
 
@@ -2843,7 +2953,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
 
       return res.status(404).json({
 
-        mensaje: "QR no válido o desactivado"
+        mensaje: "QR no vÃ¡lido o desactivado"
 
       });
 
@@ -2907,7 +3017,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
 
 
 
-    // Crear también un evento para el propietario
+    // Crear tambiÃ©n un evento para el propietario
 
     await client.query(
 
@@ -2939,7 +3049,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
 
         'PUBLICO',
 
-        'Se reportó un posible avistamiento de la mascota',
+        'Se reportÃ³ un posible avistamiento de la mascota',
 
         $2,
 
@@ -3171,6 +3281,6 @@ app.listen(PORT, "0.0.0.0", () => {
 
   console.log(`Acceso local: http://localhost:${PORT}`);
 
-  console.log(`Acceso público configurado: ${process.env.PUBLIC_BASE_URL}`);
+  console.log(`Acceso pÃºblico configurado: ${process.env.PUBLIC_BASE_URL}`);
 
 });
