@@ -120,6 +120,7 @@ factory Mascota.fromJson(Map<String, dynamic> json) {
     imagenPath: json['imagenPath']?.toString(),
   );
 }
+}
 
 
 // ======================================================
@@ -273,72 +274,6 @@ Future<String?> seleccionarYGuardarImagen(
   } catch (e) {
     debugPrint(
       'ERROR FOTO TAGGY: $e',
-    );
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No se pudo seleccionar la imagen: $e',
-          ),
-        ),
-      );
-    }
-
-    return null;
-  }
-}
-    // ==========================================
-    // GUARDAR FOTO DENTRO DE TAGGY
-    // ==========================================
-
-    final directorio =
-        await getApplicationDocumentsDirectory();
-
-    final carpetaFotos = Directory(
-      '${directorio.path}'
-      '${Platform.pathSeparator}'
-      'taggy_fotos',
-    );
-
-    if (!await carpetaFotos.exists()) {
-      await carpetaFotos.create(
-        recursive: true,
-      );
-    }
-
-    final rutaOriginal =
-        imagen.path.toLowerCase();
-
-    String extension = '.jpg';
-
-    if (rutaOriginal.endsWith('.png')) {
-      extension = '.png';
-    } else if (rutaOriginal.endsWith('.webp')) {
-      extension = '.webp';
-    } else if (rutaOriginal.endsWith('.jpeg')) {
-      extension = '.jpeg';
-    }
-
-    final nombreArchivo =
-        'mascota_'
-        '${DateTime.now().millisecondsSinceEpoch}'
-        '$extension';
-
-    final nuevaRuta =
-        '${carpetaFotos.path}'
-        '${Platform.pathSeparator}'
-        '$nombreArchivo';
-
-    final archivoGuardado =
-        await File(imagen.path).copy(
-      nuevaRuta,
-    );
-
-    return archivoGuardado.path;
-  } catch (e) {
-    debugPrint(
-      'ERROR AL SELECCIONAR FOTO TAGGY: $e',
     );
 
     if (context.mounted) {
@@ -763,85 +698,87 @@ class _RegistroPageState
       TextEditingController();
 
   Future<void> crearCuenta() async {
-    final nombre =
-        nombreController.text.trim();
+  final nombre = nombreController.text.trim();
+  final correo = correoController.text.trim();
+  final telefono = telefonoController.text.trim();
+  final password = passwordController.text;
+  final confirmar = confirmarController.text;
 
-    final correo =
-        correoController.text.trim();
-
-    final telefono =
-        telefonoController.text.trim();
-
-    final password =
-        passwordController.text;
-
-    final confirmar =
-        confirmarController.text;
-
-    if (nombre.isEmpty ||
-        correo.isEmpty ||
-        telefono.isEmpty ||
-        password.isEmpty ||
-        confirmar.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Completa todos los campos.',
-          ),
+  if (nombre.isEmpty ||
+      correo.isEmpty ||
+      telefono.isEmpty ||
+      password.isEmpty ||
+      confirmar.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Completa todos los campos.',
         ),
-      );
+      ),
+    );
 
-      return;
-    }
+    return;
+  }
 
-    if (password != confirmar) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Las contraseñas no coinciden.',
-          ),
+  if (password != confirmar) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Las contraseñas no coinciden.',
         ),
-      );
-
-      return;
-    }
-
-    final prefs =
-        await SharedPreferences.getInstance();
-
-    await prefs.setString(
-      'taggy_user_name',
-      nombre,
+      ),
     );
 
-    await prefs.setString(
-      'taggy_user_email',
-      correo,
+    return;
+  }
+
+  try {
+    await ApiService.registrarUsuario(
+      nombre: nombre,
+      email: correo,
+      password: password,
+      telefono: telefono,
     );
 
-    await prefs.setString(
-      'taggy_user_phone',
-      telefono,
-    );
-
-    await prefs.setBool(
-      'taggy_logged_in',
-      true,
+    // Después de crear la cuenta, inicia sesión automáticamente
+    await ApiService.login(
+      email: correo,
+      password: password,
     );
 
     if (!mounted) return;
 
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Cuenta creada correctamente',
+        ),
+      ),
+    );
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            const HomePage(),
+        builder: (_) => const HomePage(),
       ),
       (route) => false,
     );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          e.toString().replaceFirst(
+                'Exception: ',
+                '',
+              ),
+        ),
+      ),
+    );
   }
+}
+  
 
   @override
   void dispose() {
@@ -2723,6 +2660,22 @@ class AlertasPage extends StatelessWidget {
 
 class PerfilPage extends StatelessWidget {
   const PerfilPage({super.key});
+    Future<void> cerrarSesion(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setBool('taggy_logged_in', false);
+    await prefs.remove('taggy_token');
+
+    if (!context.mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const LoginPage(),
+      ),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2812,8 +2765,30 @@ class PerfilPage extends StatelessWidget {
             titulo: 'Seguridad',
             valor: 'Protección activa',
           ),
+          const SizedBox(height: 25),
+
+SizedBox(
+  height: 54,
+  child: OutlinedButton.icon(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: TaggyColors.red,
+      side: const BorderSide(
+        color: TaggyColors.red,
+      ),
+    ),
+    onPressed: () => cerrarSesion(context),
+    icon: const Icon(Icons.logout),
+    label: const Text(
+      'Cerrar sesión',
+      style: TextStyle(
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  ),
+),
         ],
       ),
+      
     );
   }
 }

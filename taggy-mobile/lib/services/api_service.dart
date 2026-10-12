@@ -4,7 +4,12 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl =
+      'https://taggy-api.onrender.com';
+
+  // =====================================================
+  // HEADERS CON TOKEN
+  // =====================================================
 
   static Future<Map<String, String>> _headers() async {
     final prefs = await SharedPreferences.getInstance();
@@ -17,6 +22,42 @@ class ApiService {
         'Authorization': 'Bearer $token',
     };
   }
+
+  // =====================================================
+  // REGISTRAR USUARIO
+  // =====================================================
+
+  static Future<void> registrarUsuario({
+    required String nombre,
+    required String email,
+    required String password,
+    required String telefono,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/usuarios'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'nombre': nombre,
+        'email': email,
+        'password': password,
+        'telefono': telefono,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 201) {
+      throw Exception(
+        data['mensaje'] ?? 'No se pudo crear la cuenta',
+      );
+    }
+  }
+
+  // =====================================================
+  // LOGIN
+  // =====================================================
 
   static Future<void> login({
     required String email,
@@ -44,7 +85,9 @@ class ApiService {
     final token = data['token'];
 
     if (token == null || token.toString().isEmpty) {
-      throw Exception('El servidor no devolvió un token');
+      throw Exception(
+        'El servidor no devolvió un token',
+      );
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -65,6 +108,10 @@ class ApiService {
     );
   }
 
+  // =====================================================
+  // OBTENER MASCOTAS
+  // =====================================================
+
   static Future<List<dynamic>> obtenerMascotas() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/mascotas'),
@@ -75,7 +122,8 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw Exception(
-        data['mensaje'] ?? 'No se pudieron obtener las mascotas',
+        data['mensaje'] ??
+            'No se pudieron obtener las mascotas',
       );
     }
 
