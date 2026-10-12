@@ -8,11 +8,12 @@ class ApiService {
       'https://taggy-api.onrender.com';
 
   // =====================================================
-  // HEADERS CON TOKEN
+  // HEADERS CON JWT
   // =====================================================
 
   static Future<Map<String, String>> _headers() async {
     final prefs = await SharedPreferences.getInstance();
+
     final token = prefs.getString('taggy_token');
 
     return {
@@ -37,6 +38,7 @@ class ApiService {
       Uri.parse('$baseUrl/api/usuarios'),
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: jsonEncode({
         'nombre': nombre,
@@ -50,7 +52,8 @@ class ApiService {
 
     if (response.statusCode != 201) {
       throw Exception(
-        data['mensaje'] ?? 'No se pudo crear la cuenta',
+        data['mensaje'] ??
+            'No se pudo crear la cuenta',
       );
     }
   }
@@ -67,6 +70,7 @@ class ApiService {
       Uri.parse('$baseUrl/api/login'),
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: jsonEncode({
         'email': email,
@@ -78,19 +82,22 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw Exception(
-        data['mensaje'] ?? 'No se pudo iniciar sesión',
+        data['mensaje'] ??
+            'No se pudo iniciar sesión',
       );
     }
 
     final token = data['token'];
 
-    if (token == null || token.toString().isEmpty) {
+    if (token == null ||
+        token.toString().isEmpty) {
       throw Exception(
         'El servidor no devolvió un token',
       );
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs =
+        await SharedPreferences.getInstance();
 
     await prefs.setString(
       'taggy_token',
@@ -102,9 +109,108 @@ class ApiService {
       true,
     );
 
-    await prefs.setString(
-      'taggy_user_email',
-      email,
+    final usuario = data['usuario'];
+
+    if (usuario != null) {
+      await prefs.setString(
+        'taggy_user_name',
+        usuario['nombre']?.toString() ?? '',
+      );
+
+      await prefs.setString(
+        'taggy_user_lastname',
+        usuario['apellido']?.toString() ?? '',
+      );
+
+      await prefs.setString(
+        'taggy_user_email',
+        usuario['email']?.toString() ?? email,
+      );
+
+      await prefs.setString(
+        'taggy_user_phone',
+        usuario['telefono']?.toString() ?? '',
+      );
+    }
+  }
+
+  // =====================================================
+  // CERRAR SESIÓN
+  // =====================================================
+
+  static Future<void> logout() async {
+    final prefs =
+        await SharedPreferences.getInstance();
+
+    await prefs.remove('taggy_token');
+    await prefs.remove('taggy_logged_in');
+
+    await prefs.remove('taggy_user_name');
+    await prefs.remove('taggy_user_lastname');
+    await prefs.remove('taggy_user_email');
+    await prefs.remove('taggy_user_phone');
+  }
+
+  // =====================================================
+  // PERFIL
+  // =====================================================
+
+  static Future<Map<String, dynamic>>
+      obtenerPerfil() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/perfil'),
+      headers: await _headers(),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        data['mensaje'] ??
+            'No se pudo cargar el perfil',
+      );
+    }
+
+    return Map<String, dynamic>.from(
+      data['usuario'],
+    );
+  }
+
+  // =====================================================
+  // CREAR MASCOTA
+  // =====================================================
+
+  static Future<Map<String, dynamic>>
+      crearMascota({
+    required String nombre,
+    required String especie,
+    String? raza,
+    String? sexo,
+    String? color,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/mascotas'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'nombre': nombre,
+        'especie': especie,
+        'raza': raza,
+        'sexo': sexo,
+        'color': color,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode != 201) {
+      throw Exception(
+        data['mensaje'] ??
+            'No se pudo registrar la mascota',
+      );
+    }
+
+    return Map<String, dynamic>.from(
+      data['mascota'],
     );
   }
 
@@ -112,7 +218,8 @@ class ApiService {
   // OBTENER MASCOTAS
   // =====================================================
 
-  static Future<List<dynamic>> obtenerMascotas() async {
+  static Future<List<dynamic>>
+      obtenerMascotas() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/mascotas'),
       headers: await _headers(),
@@ -131,6 +238,10 @@ class ApiService {
       return data;
     }
 
-    return data['mascotas'] ?? [];
+    if (data['mascotas'] is List) {
+      return data['mascotas'];
+    }
+
+    return [];
   }
 }

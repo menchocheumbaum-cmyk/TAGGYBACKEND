@@ -1,4 +1,4 @@
-const jwt = require("jsonwebtoken");
+﻿const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const path = require("path");
 const QRCode = require("qrcode");
@@ -33,7 +33,7 @@ function verificarToken(req, res, next) {
 
   if (partes.length !== 2 || partes[0] !== "Bearer") {
     return res.status(401).json({
-      mensaje: "Formato de token inválido"
+      mensaje: "Formato de token invÃ¡lido"
     });
   }
 
@@ -48,7 +48,7 @@ function verificarToken(req, res, next) {
 
   } catch (error) {
     return res.status(401).json({
-      mensaje: "Token inválido o expirado"
+      mensaje: "Token invÃ¡lido o expirado"
     });
   }
 }
@@ -130,7 +130,7 @@ app.post("/api/usuarios", async (req, res) => {
 
     if (error.code === "23505") {
       return res.status(409).json({
-        mensaje: "El correo electrónico ya está registrado"
+        mensaje: "El correo electrÃ³nico ya estÃ¡ registrado"
       });
     }
 
@@ -168,7 +168,7 @@ app.post("/api/login", async (req, res) => {
 
     if (resultado.rows.length === 0) {
       return res.status(401).json({
-        mensaje: "Correo o contraseña incorrectos"
+        mensaje: "Correo o contraseÃ±a incorrectos"
       });
     }
 
@@ -181,7 +181,7 @@ app.post("/api/login", async (req, res) => {
 
     if (!passwordCorrecto) {
       return res.status(401).json({
-        mensaje: "Correo o contraseña incorrectos"
+        mensaje: "Correo o contraseÃ±a incorrectos"
       });
     }
 
@@ -197,7 +197,7 @@ app.post("/api/login", async (req, res) => {
     );
 
     res.json({
-      mensaje: "Inicio de sesión correcto",
+      mensaje: "Inicio de sesiÃ³n correcto",
       token: token,
       usuario: {
         id: usuario.id,
@@ -216,6 +216,47 @@ app.post("/api/login", async (req, res) => {
     });
   }
 });
+
+// ======================================================
+// PERFIL DEL USUARIO AUTENTICADO
+// ======================================================
+
+app.get("/api/perfil", verificarToken, async (req, res) => {
+  try {
+    const resultado = await db.query(
+      `
+        SELECT
+          id,
+          nombre,
+          apellido,
+          email,
+          telefono,
+          fecha_creacion
+        FROM usuarios
+        WHERE id = $1
+      `,
+      [req.usuario.id]
+    );
+
+    if (resultado.rows.length === 0) {
+      return res.status(404).json({
+        mensaje: "Usuario no encontrado"
+      });
+    }
+
+    res.json({
+      usuario: resultado.rows[0]
+    });
+
+  } catch (error) {
+    console.error("Error al consultar perfil:", error);
+
+    res.status(500).json({
+      mensaje: "Error interno del servidor"
+    });
+  }
+});
+
 app.post("/api/mascotas", verificarToken, async (req, res) => {
   try {
     const {
@@ -570,13 +611,13 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
     if (latitud < -90 || latitud > 90) {
       return res.status(400).json({
-        mensaje: "Latitud inválida"
+        mensaje: "Latitud invÃ¡lida"
       });
     }
 
     if (longitud < -180 || longitud > 180) {
       return res.status(400).json({
-        mensaje: "Longitud inválida"
+        mensaje: "Longitud invÃ¡lida"
       });
     }
 
@@ -585,7 +626,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
       (Number(battery) < 0 || Number(battery) > 100)
     ) {
       return res.status(400).json({
-        mensaje: "Porcentaje de batería inválido"
+        mensaje: "Porcentaje de baterÃ­a invÃ¡lido"
       });
     }
 
@@ -658,7 +699,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
     await client.query("COMMIT");
 
     res.status(201).json({
-      mensaje: "Ubicación recibida correctamente",
+      mensaje: "UbicaciÃ³n recibida correctamente",
       device_uid: deviceUid,
       ubicacion: ubicacion.rows[0]
     });
@@ -666,7 +707,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
 
-    console.error("Error al recibir ubicación:", error);
+    console.error("Error al recibir ubicaciÃ³n:", error);
 
     res.status(500).json({
       mensaje: "Error interno del servidor"
@@ -731,7 +772,7 @@ app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) =
 
     if (datos.latitud === null || datos.longitud === null) {
       return res.status(404).json({
-        mensaje: "La mascota todavía no tiene ubicaciones registradas"
+        mensaje: "La mascota todavÃ­a no tiene ubicaciones registradas"
       });
     }
 
@@ -760,7 +801,7 @@ app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) =
     });
 
   } catch (error) {
-    console.error("Error al consultar última ubicación:", error);
+    console.error("Error al consultar Ãºltima ubicaciÃ³n:", error);
 
     res.status(500).json({
       mensaje: "Error interno del servidor"
@@ -817,7 +858,7 @@ app.post("/api/device/:deviceUid/event", async (req, res) => {
 
     const datosDispositivo = dispositivo.rows[0];
 
-    // En mantenimiento no queremos generar falsas alertas de manipulación
+    // En mantenimiento no queremos generar falsas alertas de manipulaciÃ³n
     if (
       type === "MANIPULACION" &&
       datosDispositivo.modo === "mantenimiento"
@@ -951,7 +992,7 @@ app.put("/api/dispositivos/:deviceUid/modo", verificarToken, async (req, res) =>
 
     if (!modo || !modosPermitidos.includes(modo)) {
       return res.status(400).json({
-        mensaje: "Modo inválido",
+        mensaje: "Modo invÃ¡lido",
         modosPermitidos
       });
     }
@@ -1003,7 +1044,7 @@ app.put("/api/dispositivos/:deviceUid/modo", verificarToken, async (req, res) =>
       ]
     );
 
-    // Mantenemos sincronizado el estado de extravío de la mascota.
+    // Mantenemos sincronizado el estado de extravÃ­o de la mascota.
     await client.query(
       `
       UPDATE mascotas
@@ -1099,7 +1140,7 @@ app.get("/api/device/:deviceUid/config", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error al consultar configuración:", error);
+    console.error("Error al consultar configuraciÃ³n:", error);
 
     res.status(500).json({
       mensaje: "Error interno del servidor"
@@ -1146,7 +1187,7 @@ app.post("/api/mascotas/:id/qr", verificarToken, async (req, res) => {
       });
     }
 
-    // Generar token único
+    // Generar token Ãºnico
     const token = crypto.randomUUID();
 
     const resultado = await db.query(
@@ -1218,13 +1259,13 @@ app.get("/api/public/pet/:token", async (req, res) => {
 
     if (resultado.rows.length === 0) {
       return res.status(404).json({
-        mensaje: "QR no válido o desactivado"
+        mensaje: "QR no vÃ¡lido o desactivado"
       });
     }
 
     const datos = resultado.rows[0];
 
-    // Registrar que alguien abrió el perfil mediante QR
+    // Registrar que alguien abriÃ³ el perfil mediante QR
     await db.query(
       `
       INSERT INTO eventos (
@@ -1238,7 +1279,7 @@ app.get("/api/public/pet/:token", async (req, res) => {
         $1,
         'QR_SCAN',
         'PUBLICO',
-        'Se accedió al perfil público mediante código QR',
+        'Se accediÃ³ al perfil pÃºblico mediante cÃ³digo QR',
         $2::jsonb
       )
       `,
@@ -1269,7 +1310,7 @@ app.get("/api/public/pet/:token", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error en perfil público:", error);
+    console.error("Error en perfil pÃºblico:", error);
 
     res.status(500).json({
       mensaje: "Error interno del servidor"
@@ -1297,7 +1338,7 @@ app.get("/api/public/qr/:token.png", async (req, res) => {
 
     if (resultado.rows.length === 0) {
       return res.status(404).json({
-        mensaje: "QR no válido o desactivado"
+        mensaje: "QR no vÃ¡lido o desactivado"
       });
     }
 
@@ -1366,7 +1407,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
       (!Number.isFinite(latitud) || latitud < -90 || latitud > 90)
     ) {
       return res.status(400).json({
-        mensaje: "Latitud inválida"
+        mensaje: "Latitud invÃ¡lida"
       });
     }
 
@@ -1375,7 +1416,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
       (!Number.isFinite(longitud) || longitud < -180 || longitud > 180)
     ) {
       return res.status(400).json({
-        mensaje: "Longitud inválida"
+        mensaje: "Longitud invÃ¡lida"
       });
     }
 
@@ -1400,7 +1441,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
       await client.query("ROLLBACK");
 
       return res.status(404).json({
-        mensaje: "QR no válido o desactivado"
+        mensaje: "QR no vÃ¡lido o desactivado"
       });
     }
 
@@ -1432,7 +1473,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
       ]
     );
 
-    // Crear también un evento para el propietario
+    // Crear tambiÃ©n un evento para el propietario
     await client.query(
       `
       INSERT INTO eventos (
@@ -1448,7 +1489,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
         $1,
         'AVISTAMIENTO',
         'PUBLICO',
-        'Se reportó un posible avistamiento de la mascota',
+        'Se reportÃ³ un posible avistamiento de la mascota',
         $2,
         $3,
         $4::jsonb
@@ -1564,5 +1605,5 @@ res.json({
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TAGGY funcionando en puerto ${PORT}`);
   console.log(`Acceso local: http://localhost:${PORT}`);
-  console.log(`Acceso público configurado: ${process.env.PUBLIC_BASE_URL}`);
+  console.log(`Acceso pÃºblico configurado: ${process.env.PUBLIC_BASE_URL}`);
 });

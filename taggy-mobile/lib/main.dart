@@ -912,6 +912,7 @@ class HomePage extends StatefulWidget {
 
   @override
   State<HomePage> createState() => _HomePageState();
+  
 }
 
 class _HomePageState extends State<HomePage> {
@@ -996,12 +997,45 @@ Future<void> cargarMascotas() async {
   }
 
   Future<void> agregarMascota(Mascota mascota) async {
-    setState(() {
-      mascotas.add(mascota);
-    });
+  try {
+    await ApiService.crearMascota(
+      nombre: mascota.nombre,
+      especie: 'Perro',
+      raza: mascota.raza,
+      sexo: mascota.sexo,
+      color: mascota.color,
+    );
 
-    await guardarMascotas();
+    final lista = await ApiService.obtenerMascotas();
+
+    final nuevasMascotas = lista.map((item) {
+      return Mascota.fromJson(
+        Map<String, dynamic>.from(item),
+      );
+    }).toList();
+
+    if (!mounted) return;
+
+    setState(() {
+      mascotas = nuevasMascotas;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          e.toString().replaceFirst(
+            'Exception: ',
+            '',
+          ),
+        ),
+      ),
+    );
+
+    rethrow;
   }
+}
 
   Future<void> editarMascota(
     int index,
