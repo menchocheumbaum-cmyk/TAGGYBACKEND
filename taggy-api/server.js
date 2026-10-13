@@ -1013,19 +1013,18 @@ app.put("/api/mascotas/:id/extravio", verificarToken, async (req, res) => {
     }
 
     await client.query(
-  `
-  UPDATE dispositivos
-  SET
-    bateria_porcentaje = $1,
-    ultima_conexion = CURRENT_TIMESTAMP,
-    fecha_actualizacion = CURRENT_TIMESTAMP
-  WHERE id = $2
-  `,
-  [
-    battery ?? null,
-    dispositivoId
-  ]
-);
+      `
+        UPDATE dispositivos
+        SET
+          modo = $1,
+          fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE mascota_id = $2
+      `,
+      [
+        extraviada ? "extravio" : "normal",
+        mascotaId
+      ]
+    );
 
     await client.query(
       `
@@ -1340,12 +1339,9 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
       `
 
-      SELECT id, mascota_id, device_uid
-
+      SELECT id, mascota_id, device_uid, modo
       FROM dispositivos
-
       WHERE device_uid = $1
-
         AND estado = 'activo'
 
       `,
@@ -1419,9 +1415,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
         accuracy ?? null,
 
         battery ?? null,
-
-        mode || "normal",
-
+        dispositivo.rows[0].modo || "normal",
         gps_timestamp || null
 
       ]
@@ -1431,35 +1425,18 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
 
     await client.query(
-
       `
-
-      UPDATE dispositivos
-
-      SET
-
-        bateria_porcentaje = $1,
-
-        modo = $2,
-
-        ultima_conexion = CURRENT_TIMESTAMP,
-
-        fecha_actualizacion = CURRENT_TIMESTAMP
-
-      WHERE id = $3
-
+        UPDATE dispositivos
+        SET
+          bateria_porcentaje = COALESCE($1, bateria_porcentaje),
+          ultima_conexion = CURRENT_TIMESTAMP,
+          fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = $2
       `,
-
       [
-
         battery ?? null,
-
-        mode || "normal",
-
         dispositivoId
-
       ]
-
     );
 
 
