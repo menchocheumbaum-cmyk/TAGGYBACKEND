@@ -1013,18 +1013,19 @@ app.put("/api/mascotas/:id/extravio", verificarToken, async (req, res) => {
     }
 
     await client.query(
-      `
-        UPDATE dispositivos
-        SET
-          modo = $1,
-          fecha_actualizacion = CURRENT_TIMESTAMP
-        WHERE mascota_id = $2
-      `,
-      [
-        extraviada ? "extravio" : "normal",
-        mascotaId
-      ]
-    );
+  `
+  UPDATE dispositivos
+  SET
+    bateria_porcentaje = $1,
+    ultima_conexion = CURRENT_TIMESTAMP,
+    fecha_actualizacion = CURRENT_TIMESTAMP
+  WHERE id = $2
+  `,
+  [
+    battery ?? null,
+    dispositivoId
+  ]
+);
 
     await client.query(
       `
