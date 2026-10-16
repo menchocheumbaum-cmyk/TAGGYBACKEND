@@ -1,4 +1,4 @@
-﻿async function prepararEsquemaCargaTAGGY(db) {
+async function prepararEsquemaCargaTAGGY(db) {
   await db.query(`
     ALTER TABLE dispositivos
     ADD COLUMN IF NOT EXISTS cargando BOOLEAN
@@ -32,12 +32,32 @@ function registrarRutaEstadoCarga({
         const deviceUid =
           req.params.deviceUid;
 
-        const { charging } = req.body;
+        const { charging, battery } = req.body;
 
         if (typeof charging !== "boolean") {
           return res.status(400).json({
             mensaje:
               "charging debe ser true o false"
+          });
+        }
+
+        const bateriaNueva =
+          battery === undefined ||
+          battery === null
+            ? null
+            : Number(battery);
+
+        if (
+          bateriaNueva !== null &&
+          (
+            !Number.isFinite(bateriaNueva) ||
+            bateriaNueva < 0 ||
+            bateriaNueva > 100
+          )
+        ) {
+          return res.status(400).json({
+            mensaje:
+              "battery debe estar entre 0 y 100"
           });
         }
 
@@ -75,13 +95,16 @@ function registrarRutaEstadoCarga({
             UPDATE dispositivos
             SET
               cargando = $1,
+              bateria_porcentaje =
+                COALESCE($2, bateria_porcentaje),
               ultima_conexion = CURRENT_TIMESTAMP,
               push_offline_enviado = FALSE,
               fecha_actualizacion = CURRENT_TIMESTAMP
-            WHERE id = $2
+            WHERE id = $3
           `,
           [
             charging,
+            bateriaNueva,
             datos.id
           ]
         );
