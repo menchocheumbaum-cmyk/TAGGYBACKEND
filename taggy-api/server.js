@@ -1164,6 +1164,29 @@ app.put("/api/mascotas/:id/extravio", verificarToken, async (req, res) => {
     );
 
     await client.query("COMMIT");
+    // Push modo extravio TAGGY
+    try {
+      await enviarPushUsuario(
+        req.usuario.id,
+        {
+          title: extraviada
+            ? "🚨 Modo extravío activado"
+            : "✅ Modo extravío desactivado",
+
+          body: extraviada
+            ? `${resultado.rows[0].nombre} fue marcada como extraviada.`
+            : `${resultado.rows[0].nombre} fue marcada como encontrada.`,
+
+          url: "/TAGGYBACKEND/"
+        }
+      );
+    } catch (pushError) {
+      console.error(
+        "Error Push modo extravío:",
+        pushError.message
+      );
+    }
+
 
     res.json({
       mensaje: extraviada
