@@ -15,6 +15,10 @@ const crypto = require("crypto");
 const webpush = require("web-push");
 
 const { iniciarMonitorAlertas } = require("./monitor_alertas");
+const {
+  prepararEsquemaCargaTAGGY,
+  registrarRutaEstadoCarga
+} = require("./carga_taggy");
 const { notificarQr, notificarAvistamiento } = require("./push_eventos");
 
 require("dotenv").config();
@@ -32,6 +36,8 @@ const app = express();
 app.use(cors());
 
 app.use(express.json());
+
+registrarRutaEstadoCarga({ app, db, enviarPushUsuario });
 
 
 
@@ -1758,6 +1764,7 @@ app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) =
         d.device_uid,
 
         d.bateria_porcentaje,
+        d.cargando,
 
         d.modo,
 
@@ -1870,6 +1877,7 @@ app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) =
         device_uid: datos.device_uid,
 
         bateria: datos.bateria_porcentaje,
+        cargando: datos.cargando,
 
         modo: datos.modo,
 
@@ -3654,8 +3662,16 @@ app.post(
   }
 );
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, "0.0.0.0", async () => {
 
+  try {
+    await prepararEsquemaCargaTAGGY(db);
+  } catch (error) {
+    console.error(
+      "Error preparando esquema de carga:",
+      error
+    );
+  }
   iniciarMonitorAlertas({ db, enviarPushUsuario });
 
   console.log(`Servidor TAGGY funcionando en puerto ${PORT}`);
