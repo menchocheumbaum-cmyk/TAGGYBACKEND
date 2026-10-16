@@ -1,4 +1,4 @@
-﻿let intervaloMonitor = null;
+let intervaloMonitor = null;
 
 const severidadBateria = {
   normal: 0,
@@ -15,13 +15,13 @@ function categoriaBateria(porcentaje) {
 function limiteOfflineSegundos(modo) {
   switch (modo) {
     case "extravio":
-      return 2 * 60;
+      return 30;
 
     case "mantenimiento":
-      return 30 * 60;
+      return 90;
 
     default:
-      return 7 * 60;
+      return 45;
   }
 }
 
@@ -286,7 +286,7 @@ function iniciarMonitorAlertas({
   intervaloMonitor =
     setInterval(
       revisar,
-      60 * 1000
+      5 * 1000
     );
 
   if (intervaloMonitor.unref) {

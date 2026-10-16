@@ -1,4 +1,4 @@
-﻿const jwt = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 
 const bcrypt = require("bcryptjs");
 
@@ -121,7 +121,11 @@ async function enviarPushUsuario(
     try {
       await webpush.sendNotification(
         subscription,
-        JSON.stringify(payload)
+        JSON.stringify(payload),
+        {
+          TTL: 3600,
+          urgency: "high"
+        }
       );
 
       enviados++;
