@@ -15,6 +15,7 @@ const crypto = require("crypto");
 const webpush = require("web-push");
 
 const { iniciarMonitorAlertas } = require("./monitor_alertas");
+const { notificarQr, notificarAvistamiento } = require("./push_eventos");
 
 require("dotenv").config();
 
@@ -2612,6 +2613,7 @@ app.get("/api/public/pet/:token", async (req, res) => {
       SELECT
 
         m.id AS mascota_id,
+        m.usuario_id AS usuario_id,
 
         m.nombre,
 
@@ -2739,6 +2741,13 @@ app.get("/api/public/pet/:token", async (req, res) => {
 
 
 
+    await notificarQr({
+      db,
+      enviarPushUsuario,
+      usuarioId: datos.usuario_id,
+      mascotaId: datos.mascota_id,
+      nombre: datos.nombre
+    });
     res.json({
 
       mascota: {
@@ -3010,7 +3019,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
       SELECT
 
         q.mascota_id,
-
+        m.usuario_id AS usuario_id,
         m.nombre AS mascota_nombre
 
       FROM qr_tokens q
@@ -3172,6 +3181,14 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
 
 
     await client.query("COMMIT");
+    await notificarAvistamiento({
+      enviarPushUsuario,
+      usuarioId: qr.rows[0].usuario_id,
+      nombreMascota: qr.rows[0].mascota_nombre,
+      nombreReportante: nombre || null,
+      latitud,
+      longitud
+    });
 
 
 
