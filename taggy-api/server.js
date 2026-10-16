@@ -14,6 +14,8 @@ const crypto = require("crypto");
 
 const webpush = require("web-push");
 
+const { iniciarMonitorAlertas } = require("./monitor_alertas");
+
 require("dotenv").config();
 
 
@@ -3495,6 +3497,8 @@ app.post(
 );
 
 app.listen(PORT, "0.0.0.0", () => {
+
+  iniciarMonitorAlertas({ db, enviarPushUsuario });
 
   console.log(`Servidor TAGGY funcionando en puerto ${PORT}`);
 
