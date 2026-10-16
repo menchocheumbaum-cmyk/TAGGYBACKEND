@@ -12,6 +12,8 @@ const cors = require("cors");
 
 const crypto = require("crypto");
 
+const webpush = require("web-push");
+
 require("dotenv").config();
 
 
@@ -41,6 +43,110 @@ app.use(
 );
 
 
+
+
+// ======================================================
+// WEB PUSH / NOTIFICACIONES TAGGY
+// ======================================================
+
+function configurarWebPushTAGGY() {
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT;
+
+  if (!publicKey || !privateKey || !subject) {
+    console.warn(
+      "Web Push desactivado: faltan variables VAPID"
+    );
+    return false;
+  }
+
+  webpush.setVapidDetails(
+    subject,
+    publicKey,
+    privateKey
+  );
+
+  return true;
+}
+
+const webPushActivo = configurarWebPushTAGGY();
+
+async function enviarPushUsuario(
+  usuarioId,
+  payload
+) {
+  if (!webPushActivo) {
+    return {
+      enviados: 0,
+      eliminados: 0
+    };
+  }
+
+  const resultado = await db.query(
+    `
+      SELECT
+        id,
+        endpoint,
+        p256dh,
+        auth
+      FROM push_suscripciones
+      WHERE usuario_id = $1
+        AND activa = TRUE
+    `,
+    [usuarioId]
+  );
+
+  let enviados = 0;
+  let eliminados = 0;
+
+  for (const fila of resultado.rows) {
+    const subscription = {
+      endpoint: fila.endpoint,
+      keys: {
+        p256dh: fila.p256dh,
+        auth: fila.auth
+      }
+    };
+
+    try {
+      await webpush.sendNotification(
+        subscription,
+        JSON.stringify(payload)
+      );
+
+      enviados++;
+    } catch (error) {
+      if (
+        error.statusCode === 404 ||
+        error.statusCode === 410
+      ) {
+        await db.query(
+          `
+            UPDATE push_suscripciones
+            SET
+              activa = FALSE,
+              fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = $1
+          `,
+          [fila.id]
+        );
+
+        eliminados++;
+      } else {
+        console.error(
+          "Error enviando Web Push:",
+          error.statusCode || error.message
+        );
+      }
+    }
+  }
+
+  return {
+    enviados,
+    eliminados
+  };
+}
 
 function verificarToken(req, res, next) {
 
@@ -3252,6 +3358,141 @@ res.json({
   }
 
 });
+
+
+// ======================================================
+// PUSH - CLAVE PUBLICA
+// ======================================================
+
+app.get("/api/push/public-key", (req, res) => {
+  if (!process.env.VAPID_PUBLIC_KEY) {
+    return res.status(503).json({
+      mensaje: "Web Push no configurado"
+    });
+  }
+
+  res.json({
+    publicKey: process.env.VAPID_PUBLIC_KEY
+  });
+});
+
+// ======================================================
+// PUSH - REGISTRAR SUSCRIPCION
+// ======================================================
+
+app.post(
+  "/api/push/subscribe",
+  verificarToken,
+  async (req, res) => {
+    try {
+      const {
+        endpoint,
+        keys,
+        plataforma,
+        user_agent
+      } = req.body;
+
+      if (
+        !endpoint ||
+        !keys ||
+        !keys.p256dh ||
+        !keys.auth
+      ) {
+        return res.status(400).json({
+          mensaje: "Suscripción Push incompleta"
+        });
+      }
+
+      const resultado = await db.query(
+        `
+          INSERT INTO push_suscripciones (
+            usuario_id,
+            endpoint,
+            p256dh,
+            auth,
+            plataforma,
+            user_agent,
+            activa,
+            fecha_actualizacion
+          )
+          VALUES (
+            $1,$2,$3,$4,$5,$6,TRUE,CURRENT_TIMESTAMP
+          )
+          ON CONFLICT (endpoint)
+          DO UPDATE SET
+            usuario_id = EXCLUDED.usuario_id,
+            p256dh = EXCLUDED.p256dh,
+            auth = EXCLUDED.auth,
+            plataforma = EXCLUDED.plataforma,
+            user_agent = EXCLUDED.user_agent,
+            activa = TRUE,
+            fecha_actualizacion = CURRENT_TIMESTAMP
+          RETURNING id
+        `,
+        [
+          req.usuario.id,
+          endpoint,
+          keys.p256dh,
+          keys.auth,
+          plataforma || "web",
+          user_agent || null
+        ]
+      );
+
+      res.status(201).json({
+        mensaje: "Notificaciones activadas",
+        suscripcion_id: resultado.rows[0].id
+      });
+
+    } catch (error) {
+      console.error(
+        "Error registrando Push:",
+        error
+      );
+
+      res.status(500).json({
+        mensaje: "Error interno del servidor"
+      });
+    }
+  }
+);
+
+// ======================================================
+// PUSH - PRUEBA
+// ======================================================
+
+app.post(
+  "/api/push/test",
+  verificarToken,
+  async (req, res) => {
+    try {
+      const resultado =
+        await enviarPushUsuario(
+          req.usuario.id,
+          {
+            title: "TAGGY",
+            body: "Las notificaciones funcionan correctamente 🐾",
+            url: "/TAGGYBACKEND/"
+          }
+        );
+
+      res.json({
+        mensaje: "Prueba Push procesada",
+        ...resultado
+      });
+
+    } catch (error) {
+      console.error(
+        "Error en Push de prueba:",
+        error
+      );
+
+      res.status(500).json({
+        mensaje: "Error interno del servidor"
+      });
+    }
+  }
+);
 
 app.listen(PORT, "0.0.0.0", () => {
 
