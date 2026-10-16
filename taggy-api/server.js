@@ -21,6 +21,12 @@ const {
 } = require("./carga_taggy");
 const { notificarQr, notificarAvistamiento } = require("./push_eventos");
 
+const {
+  prepararEsquemaGeocercaTAGGY,
+  registrarRutasGeocerca,
+  evaluarGeocerca
+} = require("./geocerca_taggy");
+
 require("dotenv").config();
 
 
@@ -226,6 +232,12 @@ function verificarToken(req, res, next) {
 }
 
 
+
+registrarRutasGeocerca({
+  app,
+  db,
+  verificarToken
+});
 
 app.get("/", (req, res) => {
 
@@ -1585,7 +1597,23 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
     await client.query("COMMIT");
 
-
+    try {
+      await evaluarGeocerca({
+        db,
+        enviarPushUsuario,
+        mascotaId:
+          dispositivo.rows[0].mascota_id,
+        latitud,
+        longitud,
+        precisionMetros:
+          accuracy ?? null
+      });
+    } catch (geoError) {
+      console.error(
+        "Error evaluando geocerca:",
+        geoError.message
+      );
+    }
 
     res.status(201).json({
 
@@ -3676,6 +3704,15 @@ app.listen(PORT, "0.0.0.0", async () => {
       error
     );
   }
+  try {
+    await prepararEsquemaGeocercaTAGGY(db);
+  } catch (error) {
+    console.error(
+      "Error preparando esquema geocerca:",
+      error
+    );
+  }
+
   iniciarMonitorAlertas({ db, enviarPushUsuario });
 
   console.log(`Servidor TAGGY funcionando en puerto ${PORT}`);
