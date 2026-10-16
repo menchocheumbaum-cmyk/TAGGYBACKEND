@@ -1615,6 +1615,124 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
 });
 
+
+// ======================================================
+// HISTORIAL DE UBICACIONES DE UNA MASCOTA
+// ======================================================
+
+app.get(
+  "/api/mascotas/:id/ubicaciones",
+  verificarToken,
+  async (req, res) => {
+    try {
+      const mascotaId = req.params.id;
+
+      let horas = Number(req.query.horas || 24);
+      let limite = Number(req.query.limite || 500);
+
+      if (!Number.isFinite(horas)) {
+        horas = 24;
+      }
+
+      if (!Number.isFinite(limite)) {
+        limite = 500;
+      }
+
+      horas = Math.min(
+        Math.max(Math.floor(horas), 1),
+        720
+      );
+
+      limite = Math.min(
+        Math.max(Math.floor(limite), 2),
+        1000
+      );
+
+      const mascota = await db.query(
+        `
+          SELECT
+            id,
+            nombre
+          FROM mascotas
+          WHERE id = $1
+            AND usuario_id = $2
+        `,
+        [
+          mascotaId,
+          req.usuario.id
+        ]
+      );
+
+      if (mascota.rows.length === 0) {
+        return res.status(404).json({
+          mensaje: "Mascota no encontrada"
+        });
+      }
+
+      const resultado = await db.query(
+        `
+          SELECT *
+          FROM (
+            SELECT
+              u.id,
+              u.latitud,
+              u.longitud,
+              u.altitud,
+              u.precision_metros,
+              u.bateria_porcentaje,
+              u.modo,
+              u.fecha_gps,
+              u.fecha_recepcion,
+              d.device_uid
+
+            FROM ubicaciones u
+
+            JOIN dispositivos d
+              ON d.id = u.dispositivo_id
+
+            WHERE d.mascota_id = $1
+              AND u.fecha_recepcion >=
+                  CURRENT_TIMESTAMP
+                  - ($2 * INTERVAL '1 hour')
+
+            ORDER BY u.fecha_recepcion DESC
+
+            LIMIT $3
+          ) historial
+
+          ORDER BY fecha_recepcion ASC
+        `,
+        [
+          mascotaId,
+          horas,
+          limite
+        ]
+      );
+
+      res.json({
+        mascota: {
+          id: mascota.rows[0].id,
+          nombre: mascota.rows[0].nombre
+        },
+
+        periodo_horas: horas,
+        total: resultado.rows.length,
+        ubicaciones: resultado.rows
+      });
+
+    } catch (error) {
+      console.error(
+        "Error historial de ubicaciones:",
+        error
+      );
+
+      res.status(500).json({
+        mensaje: "Error interno del servidor"
+      });
+    }
+  }
+);
+
 app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) => {
 
   try {
