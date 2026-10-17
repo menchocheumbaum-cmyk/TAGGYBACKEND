@@ -2581,7 +2581,7 @@ app.get("/api/device/:deviceUid/config", async (req, res) => {
 
       case "extravio":
 
-        intervaloUbicacion = 30;
+        intervaloUbicacion = 10;
 
         break;
 
@@ -2589,7 +2589,7 @@ app.get("/api/device/:deviceUid/config", async (req, res) => {
 
       case "mantenimiento":
 
-        intervaloUbicacion = 900;
+        intervaloUbicacion = 300;
 
         break;
 
@@ -2597,7 +2597,7 @@ app.get("/api/device/:deviceUid/config", async (req, res) => {
 
       default:
 
-        intervaloUbicacion = 300;
+        intervaloUbicacion = 30;
 
     }
 
