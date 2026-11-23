@@ -19,9 +19,21 @@
 
         <section class="tarjeta">
 
-            <div class="foto">
-                🐾
-            </div>
+            <div class="foto" id="fotoMascota" style="overflow:hidden">
+    <span id="fotoPlaceholder">🐾</span>
+
+    <img
+        id="imagenMascota"
+        alt="Foto de la mascota"
+        style="
+            display:none;
+            width:100%;
+            height:100%;
+            object-fit:cover;
+            border-radius:50%;
+        "
+    >
+</div>
 
             <h1 id="nombreMascota">
                 Cargando...
@@ -33,7 +45,7 @@
                 id="alertaExtravio"
                 class="alerta oculto"
             >
-                🚨 MASCOTA EXTRAVIADA
+                ðŸš¨ MASCOTA EXTRAVIADA
             </div>
 
             <div class="datos">
@@ -49,7 +61,7 @@
                 </p>
 
                 <p>
-                    <strong>Señas particulares:</strong>
+                    <strong>SeÃ±as particulares:</strong>
                     <span id="senas"></span>
                 </p>
 
@@ -66,7 +78,7 @@
                     class="boton"
                     href="#"
                 >
-                    📞 Contactar propietario
+                    ðŸ“ž Contactar propietario
                 </a>
 
             </div>
@@ -77,7 +89,7 @@
         class="boton boton-secundario"
         type="button"
     >
-        📍 Reportar avistamiento
+        ðŸ“ Reportar avistamiento
     </button>
 
     <form
@@ -88,7 +100,7 @@
         <h2>Reportar avistamiento</h2>
 
         <p class="texto-ayuda">
-            Si viste a esta mascota, puedes enviar información al propietario.
+            Si viste a esta mascota, puedes enviar informaciÃ³n al propietario.
         </p>
 
         <label for="nombreReportante">
@@ -102,7 +114,7 @@
         >
 
         <label for="telefonoReportante">
-            Tu teléfono
+            Tu telÃ©fono
         </label>
 
         <input
@@ -112,7 +124,7 @@
         >
 
         <label for="mensajeAvistamiento">
-            ¿Dónde la viste?
+            Â¿DÃ³nde la viste?
         </label>
 
         <textarea
@@ -126,7 +138,7 @@
             class="boton boton-ubicacion"
             type="button"
         >
-            📍 Usar mi ubicación actual
+            ðŸ“ Usar mi ubicaciÃ³n actual
         </button>
 
         <p id="estadoUbicacion"></p>
@@ -148,7 +160,7 @@
 
 
         <p class="footer">
-            Identificación inteligente TAGGY
+            IdentificaciÃ³n inteligente TAGGY
         </p>
 
     </main>

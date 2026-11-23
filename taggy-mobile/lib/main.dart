@@ -1,12 +1,21 @@
+import 'design/taggy_design_system.dart';
+
+import 'dart:async';
+
+import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart';
+
 import 'services/api_service.dart';
+import 'services/push_service.dart';
+
 import 'dart:convert';
-import 'dart:io';
-import 'package:file_picker/file_picker.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:video_player/video_player.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,23 +25,6 @@ void main() {
 // ======================================================
 // COLORES TAGGY
 // ======================================================
-
-class TaggyColors {
-  static const background = Color(0xFF07111F);
-  static const surface = Color(0xFF0E1A2B);
-  static const surfaceLight = Color(0xFF14243A);
-
-  static const blue = Color(0xFF3B82F6);
-  static const lightBlue = Color(0xFF38BDF8);
-  static const cyan = Color(0xFF22D3EE);
-
-  static const green = Color(0xFF22C55E);
-  static const red = Color(0xFFEF4444);
-  static const orange = Color(0xFFF59E0B);
-
-  static const textPrimary = Color(0xFFF8FAFC);
-  static const textSecondary = Color(0xFF94A3B8);
-}
 
 // ======================================================
 // MODELO MASCOTA
@@ -111,9 +103,7 @@ class Mascota {
 
   factory Mascota.fromJson(Map<String, dynamic> json) {
     final rawId = json['id'];
-    final id = rawId is int
-        ? rawId
-        : int.tryParse(rawId?.toString() ?? '');
+    final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
 
     return Mascota(
       id: id,
@@ -128,10 +118,9 @@ class Mascota {
           json['device_uid']?.toString() ??
           json['idTaggy']?.toString() ??
           'TAGGY-${json['id'] ?? ''}',
-      extraviada:
-          json['modo_extravio'] == true ||
-          json['extraviada'] == true,
-      imagenPath: json['imagenPath']?.toString(),
+      extraviada: json['modo_extravio'] == true || json['extraviada'] == true,
+      imagenPath:
+          json['foto_url']?.toString() ?? json['imagenPath']?.toString(),
     );
   }
 }
@@ -145,165 +134,111 @@ class Mascota {
 // FOTOS DE MASCOTAS
 // ======================================================
 
-Future<String?> seleccionarYGuardarImagen(
-  BuildContext context,
-) async {
+Future<String?> seleccionarYGuardarImagen(BuildContext context) async {
   try {
-    XFile? imagen;
-
-    // WINDOWS
-    if (Platform.isWindows) {
-      final archivo = await FilePicker.pickFile(
-        type: FileType.image,
-      );
-
-      if (archivo == null || archivo.path == null) {
-        return null;
-      }
-
-      imagen = XFile(archivo.path!);
-    }
-
-    // ANDROID / IOS
-    else {
-      final source = await showModalBottomSheet<ImageSource>(
-        context: context,
-        backgroundColor: TaggyColors.surface,
-        showDragHandle: true,
-        builder: (sheetContext) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                5,
-                20,
-                20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Foto de la mascota',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: TaggyColors.surface,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 5, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Foto de la mascota',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 15),
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_library_outlined,
+                    color: TaggyColors.lightBlue,
                   ),
-                  const SizedBox(height: 15),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.photo_library_outlined,
-                      color: TaggyColors.lightBlue,
-                    ),
-                    title: const Text(
-                      'Elegir de la galería',
-                    ),
-                    onTap: () {
-                      Navigator.pop(
-                        sheetContext,
-                        ImageSource.gallery,
-                      );
-                    },
+                  title: const Text('Elegir de la galería'),
+                  onTap: () {
+                    Navigator.pop(sheetContext, ImageSource.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: TaggyColors.cyan,
                   ),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.camera_alt_outlined,
-                      color: TaggyColors.cyan,
-                    ),
-                    title: const Text(
-                      'Tomar una foto',
-                    ),
-                    onTap: () {
-                      Navigator.pop(
-                        sheetContext,
-                        ImageSource.camera,
-                      );
-                    },
-                  ),
-                ],
-              ),
+                  title: const Text('Tomar una foto'),
+                  onTap: () {
+                    Navigator.pop(sheetContext, ImageSource.camera);
+                  },
+                ),
+              ],
             ),
-          );
-        },
-      );
-
-      if (source == null) {
-        return null;
-      }
-
-      final picker = ImagePicker();
-
-      imagen = await picker.pickImage(
-        source: source,
-        imageQuality: 82,
-        maxWidth: 1600,
-      );
-
-      if (imagen == null) {
-        return null;
-      }
-    }
-
-    final directorio =
-        await getApplicationDocumentsDirectory();
-
-    final carpetaFotos = Directory(
-      '${directorio.path}'
-      '${Platform.pathSeparator}'
-      'taggy_fotos',
+          ),
+        );
+      },
     );
 
-    if (!await carpetaFotos.exists()) {
-      await carpetaFotos.create(
-        recursive: true,
-      );
+    if (source == null) {
+      return null;
     }
 
-    final rutaOriginal = imagen.path.toLowerCase();
+    final picker = ImagePicker();
 
-    String extension = '.jpg';
-
-    if (rutaOriginal.endsWith('.png')) {
-      extension = '.png';
-    } else if (rutaOriginal.endsWith('.jpeg')) {
-      extension = '.jpeg';
-    } else if (rutaOriginal.endsWith('.webp')) {
-      extension = '.webp';
-    }
-
-    final nombreArchivo =
-        'mascota_${DateTime.now().millisecondsSinceEpoch}$extension';
-
-    final nuevaRuta =
-        '${carpetaFotos.path}'
-        '${Platform.pathSeparator}'
-        '$nombreArchivo';
-
-    final archivoGuardado =
-        await File(imagen.path).copy(
-      nuevaRuta,
+    final imagen = await picker.pickImage(
+      source: source,
+      imageQuality: 68,
+      maxWidth: 900,
+      maxHeight: 900,
     );
 
-    return archivoGuardado.path;
+    if (imagen == null) {
+      return null;
+    }
+
+    final bytes = await imagen.readAsBytes();
+
+    // Para no superar el limite JSON del servidor.
+    if (bytes.lengthInBytes > 3 * 1024 * 1024) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'La imagen es demasiado grande. Selecciona otra foto.',
+            ),
+          ),
+        );
+      }
+      return null;
+    }
+
+    final nombre = imagen.name.toLowerCase();
+
+    String mime = 'image/jpeg';
+
+    if (nombre.endsWith('.png')) {
+      mime = 'image/png';
+    } else if (nombre.endsWith('.webp')) {
+      mime = 'image/webp';
+    } else if (nombre.endsWith('.gif')) {
+      mime = 'image/gif';
+    }
+
+    final contenido = base64Encode(bytes);
+
+    return 'data:$mime;base64,$contenido';
   } catch (e) {
-    debugPrint(
-      'ERROR FOTO TAGGY: $e',
-    );
+    debugPrint('ERROR FOTO TAGGY: $e');
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No se pudo seleccionar la imagen: $e',
-          ),
-        ),
+        SnackBar(content: Text('No se pudo seleccionar la imagen: $e')),
       );
     }
 
     return null;
   }
 }
-
 // ======================================================
 // APP
 // ======================================================
@@ -313,64 +248,107 @@ class TaggyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: TaggyColors.blue,
-      brightness: Brightness.dark,
-    );
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'TAGGY',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        useMaterial3: true,
-        scaffoldBackgroundColor: TaggyColors.background,
-        colorScheme: colorScheme.copyWith(
-          primary: TaggyColors.blue,
-          secondary: TaggyColors.cyan,
-          surface: TaggyColors.surface,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: TaggyColors.background,
-          foregroundColor: TaggyColors.textPrimary,
-          centerTitle: false,
-          elevation: 0,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: TaggyColors.surfaceLight,
-          labelStyle: const TextStyle(
-            color: TaggyColors.textSecondary,
-          ),
-          hintStyle: const TextStyle(
-            color: TaggyColors.textSecondary,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: Color(0xFF1E3552),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: TaggyColors.blue,
-              width: 2,
-            ),
-          ),
-        ),
-      ),
-
-      home: const AuthGate(),
+      theme: TaggyTheme.light,
+      home: const IntroVideoPage(),
     );
   }
 }
 // ======================================================
-// CONTROL DE SESIÓN
+// CONTROL DE SESIÃ“N
+// ======================================================
+
+class IntroVideoPage extends StatefulWidget {
+  const IntroVideoPage({super.key});
+
+  @override
+  State<IntroVideoPage> createState() => _IntroVideoPageState();
+}
+
+class _IntroVideoPageState extends State<IntroVideoPage> {
+  VideoPlayerController? _controller;
+  bool _listo = false;
+  bool _terminado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _iniciarIntro();
+  }
+
+  Future<void> _iniciarIntro() async {
+    try {
+      final controller = VideoPlayerController.asset(
+        'assets/video/taggy_intro_3s.mp4',
+      );
+
+      _controller = controller;
+
+      await controller.initialize();
+      await controller.setVolume(0);
+      await controller.setLooping(false);
+
+      if (!mounted) return;
+
+      setState(() {
+        _listo = true;
+      });
+
+      await controller.play();
+
+      await Future.delayed(const Duration(seconds: 3));
+
+      _entrarApp();
+    } catch (e) {
+      debugPrint('Error cargando intro TAGGY: $e');
+
+      await Future.delayed(const Duration(seconds: 1));
+
+      _entrarApp();
+    }
+  }
+
+  void _entrarApp() {
+    if (!mounted || _terminado) return;
+
+    _terminado = true;
+
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (_) => const AuthGate()));
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SizedBox.expand(
+        child: _listo && controller != null && controller.value.isInitialized
+            ? FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: controller.value.size.width,
+                  height: controller.value.size.height,
+                  child: VideoPlayer(controller),
+                ),
+              )
+            : const ColoredBox(color: Colors.black),
+      ),
+    );
+  }
+}
+
+// ======================================================
+// CONTROL DE SESION
 // ======================================================
 
 class AuthGate extends StatefulWidget {
@@ -393,8 +371,7 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> revisarSesion() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final sesion =
-        prefs.getBool('taggy_logged_in') ?? false;
+    final sesion = prefs.getBool('taggy_logged_in') ?? false;
 
     if (!mounted) return;
 
@@ -407,11 +384,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     if (cargando) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (sesionIniciada) {
@@ -423,80 +396,57 @@ class _AuthGateState extends State<AuthGate> {
 }
 
 // ======================================================
-// INICIAR SESIÓN
+// INICIAR SESIÃ“N
 // ======================================================
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() =>
-      _LoginPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final correoController =
-      TextEditingController();
+  final correoController = TextEditingController();
 
-  final passwordController =
-      TextEditingController();
+  final passwordController = TextEditingController();
 
   bool ocultarPassword = true;
 
   Future<void> iniciarSesion() async {
-  final correo = correoController.text.trim();
-  final password = passwordController.text.trim();
+    final correo = correoController.text.trim();
+    final password = passwordController.text.trim();
 
-  if (correo.isEmpty || password.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Ingresa tu correo y contraseña.',
-        ),
-      ),
-    );
-    return;
+    if (correo.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa tu correo y contraseÃ±a.')),
+      );
+      return;
+    }
+
+    try {
+      await ApiService.login(email: correo, password: password);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Inicio de sesiÃ³n correcto')),
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
-  try {
-    await ApiService.login(
-      email: correo,
-      password: password,
-    );
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Inicio de sesión correcto',
-        ),
-      ),
-    );
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const HomePage(),
-      ),
-      (route) => false,
-    );
-  } catch (e) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          e.toString().replaceFirst(
-                'Exception: ',
-                '',
-              ),
-        ),
-      ),
-    );
-  }
-}
-    
   @override
   void dispose() {
     correoController.dispose();
@@ -510,31 +460,19 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.all(25),
+            padding: const EdgeInsets.all(25),
             child: Column(
               children: [
                 Container(
                   width: 95,
                   height: 95,
                   decoration: BoxDecoration(
-                    gradient:
-                        const LinearGradient(
-                      colors: [
-                        TaggyColors.blue,
-                        TaggyColors.cyan,
-                      ],
+                    gradient: const LinearGradient(
+                      colors: [TaggyColors.blue, TaggyColors.cyan],
                     ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      28,
-                    ),
+                    borderRadius: BorderRadius.circular(28),
                   ),
-                  child: const Icon(
-                    Icons.pets,
-                    size: 55,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.pets, size: 55, color: Colors.white),
                 ),
 
                 const SizedBox(height: 20),
@@ -543,8 +481,7 @@ class _LoginPageState extends State<LoginPage> {
                   'TAGGY',
                   style: TextStyle(
                     fontSize: 34,
-                    fontWeight:
-                        FontWeight.w900,
+                    fontWeight: FontWeight.w900,
                     letterSpacing: 2,
                   ),
                 ),
@@ -552,77 +489,50 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 8),
 
                 const Text(
-                  'Protección inteligente para tu mascota',
-                  textAlign:
-                      TextAlign.center,
-                  style: TextStyle(
-                    color: TaggyColors
-                        .textSecondary,
-                  ),
+                  'ProtecciÃ³n inteligente para tu mascota',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: TaggyColors.textSecondary),
                 ),
 
                 const SizedBox(height: 40),
 
                 const Align(
-                  alignment:
-                      Alignment.centerLeft,
+                  alignment: Alignment.centerLeft,
                   child: Text(
-                    'Iniciar sesión',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
+                    'Iniciar sesiÃ³n',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
                 TextField(
-                  controller:
-                      correoController,
-                  keyboardType:
-                      TextInputType
-                          .emailAddress,
-                  decoration:
-                      const InputDecoration(
-                    labelText:
-                        'Correo electrónico',
-                    prefixIcon: Icon(
-                      Icons.email_outlined,
-                    ),
+                  controller: correoController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Correo electrÃ³nico',
+                    prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
 
                 const SizedBox(height: 15),
 
                 TextField(
-                  controller:
-                      passwordController,
-                  obscureText:
-                      ocultarPassword,
-                  decoration:
-                      InputDecoration(
-                    labelText:
-                        'Contraseña',
-                    prefixIcon:
-                        const Icon(
-                      Icons.lock_outline,
-                    ),
-                    suffixIcon:
-                        IconButton(
+                  controller: passwordController,
+                  obscureText: ocultarPassword,
+                  decoration: InputDecoration(
+                    labelText: 'ContraseÃ±a',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
                       onPressed: () {
                         setState(() {
-                          ocultarPassword =
-                              !ocultarPassword;
+                          ocultarPassword = !ocultarPassword;
                         });
                       },
                       icon: Icon(
                         ocultarPassword
-                            ? Icons
-                                .visibility_outlined
-                            : Icons
-                                .visibility_off_outlined,
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                       ),
                     ),
                   ),
@@ -634,14 +544,10 @@ class _LoginPageState extends State<LoginPage> {
                   width: double.infinity,
                   height: 55,
                   child: FilledButton(
-                    onPressed:
-                        iniciarSesion,
+                    onPressed: iniciarSesion,
                     child: const Text(
-                      'Iniciar sesión',
-                      style: TextStyle(
-                        fontWeight:
-                            FontWeight.bold,
-                      ),
+                      'Iniciar sesiÃ³n',
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -649,26 +555,19 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 15),
 
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment
-                          .center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      '¿No tienes cuenta?',
-                    ),
+                    const Text('Â¿No tienes cuenta?'),
                     TextButton(
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                const RegistroPage(),
+                            builder: (_) => const RegistroPage(),
                           ),
                         );
                       },
-                      child: const Text(
-                        'Crear cuenta',
-                      ),
+                      child: const Text('Crear cuenta'),
                     ),
                   ],
                 ),
@@ -685,31 +584,23 @@ class _LoginPageState extends State<LoginPage> {
 // CREAR CUENTA
 // ======================================================
 
-class RegistroPage
-    extends StatefulWidget {
+class RegistroPage extends StatefulWidget {
   const RegistroPage({super.key});
 
   @override
-  State<RegistroPage> createState() =>
-      _RegistroPageState();
+  State<RegistroPage> createState() => _RegistroPageState();
 }
 
-class _RegistroPageState
-    extends State<RegistroPage> {
-  final nombreController =
-      TextEditingController();
+class _RegistroPageState extends State<RegistroPage> {
+  final nombreController = TextEditingController();
 
-  final correoController =
-      TextEditingController();
+  final correoController = TextEditingController();
 
-  final telefonoController =
-      TextEditingController();
+  final telefonoController = TextEditingController();
 
-  final passwordController =
-      TextEditingController();
+  final passwordController = TextEditingController();
 
-  final confirmarController =
-      TextEditingController();
+  final confirmarController = TextEditingController();
 
   Future<void> crearCuenta() async {
     final nombre = nombreController.text.trim();
@@ -724,18 +615,14 @@ class _RegistroPageState
         password.isEmpty ||
         confirmar.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Completa todos los campos.'),
-        ),
+        const SnackBar(content: Text('Completa todos los campos.')),
       );
       return;
     }
 
     if (password != confirmar) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Las contraseñas no coinciden.'),
-        ),
+        const SnackBar(content: Text('Las contraseÃ±as no coinciden.')),
       );
       return;
     }
@@ -748,40 +635,29 @@ class _RegistroPageState
         telefono: telefono,
       );
 
-      await ApiService.login(
-        email: correo,
-        password: password,
-      );
+      await ApiService.login(email: correo, password: password);
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cuenta creada correctamente'),
-        ),
+        const SnackBar(content: Text('Cuenta creada correctamente')),
       );
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-          builder: (_) => const HomePage(),
-        ),
+        MaterialPageRoute(builder: (_) => const HomePage()),
         (route) => false,
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
   }
 
-    @override
+  @override
   void dispose() {
     nombreController.dispose();
     correoController.dispose();
@@ -795,92 +671,65 @@ class _RegistroPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title:
-            const Text('Crear cuenta'),
-      ),
+      appBar: AppBar(title: const Text('Crear cuenta')),
       body: ListView(
-        padding:
-            const EdgeInsets.all(25),
+        padding: const EdgeInsets.all(25),
         children: [
           const Text(
             'Crear cuenta TAGGY',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight:
-                  FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 25),
 
           TextField(
-            controller:
-                nombreController,
-            decoration:
-                const InputDecoration(
-              labelText:
-                  'Nombre completo',
-              prefixIcon:
-                  Icon(Icons.person),
+            controller: nombreController,
+            decoration: const InputDecoration(
+              labelText: 'Nombre completo',
+              prefixIcon: Icon(Icons.person),
             ),
           ),
 
           const SizedBox(height: 15),
 
           TextField(
-            controller:
-                correoController,
-            decoration:
-                const InputDecoration(
-              labelText:
-                  'Correo electrónico',
-              prefixIcon:
-                  Icon(Icons.email),
+            controller: correoController,
+            decoration: const InputDecoration(
+              labelText: 'Correo electrÃ³nico',
+              prefixIcon: Icon(Icons.email),
             ),
           ),
 
           const SizedBox(height: 15),
 
           TextField(
-            controller:
-                telefonoController,
-            keyboardType:
-                TextInputType.phone,
-            decoration:
-                const InputDecoration(
-              labelText: 'Teléfono',
-              prefixIcon:
-                  Icon(Icons.phone),
+            controller: telefonoController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'TelÃ©fono',
+              prefixIcon: Icon(Icons.phone),
             ),
           ),
 
           const SizedBox(height: 15),
 
           TextField(
-            controller:
-                passwordController,
+            controller: passwordController,
             obscureText: true,
-            decoration:
-                const InputDecoration(
-              labelText: 'Contraseña',
-              prefixIcon:
-                  Icon(Icons.lock),
+            decoration: const InputDecoration(
+              labelText: 'ContraseÃ±a',
+              prefixIcon: Icon(Icons.lock),
             ),
           ),
 
           const SizedBox(height: 15),
 
           TextField(
-            controller:
-                confirmarController,
+            controller: confirmarController,
             obscureText: true,
-            decoration:
-                const InputDecoration(
-              labelText:
-                  'Confirmar contraseña',
-              prefixIcon:
-                  Icon(Icons.lock_reset),
+            decoration: const InputDecoration(
+              labelText: 'Confirmar contraseÃ±a',
+              prefixIcon: Icon(Icons.lock_reset),
             ),
           ),
 
@@ -890,12 +739,8 @@ class _RegistroPageState
             height: 55,
             child: FilledButton.icon(
               onPressed: crearCuenta,
-              icon: const Icon(
-                Icons.person_add,
-              ),
-              label: const Text(
-                'Crear cuenta',
-              ),
+              icon: const Icon(Icons.person_add),
+              label: const Text('Crear cuenta'),
             ),
           ),
         ],
@@ -934,7 +779,7 @@ class _HomePageState extends State<HomePage> {
       nombre: 'Max',
       especie: 'Perro',
       raza: 'Labrador',
-      edad: '3 años',
+      edad: '3 aÃ±os',
       sexo: 'Macho',
       color: 'Amarillo',
       peso: '28 kg',
@@ -942,7 +787,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-Future<void> cargarMascotas() async {
+  Future<void> cargarMascotas() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final datosLocales = prefs.getString(storageKey);
@@ -953,33 +798,31 @@ Future<void> cargarMascotas() async {
         try {
           final listaLocal = jsonDecode(datosLocales) as List<dynamic>;
           for (final item in listaLocal) {
-            final local = Mascota.fromJson(
-              Map<String, dynamic>.from(item),
-            );
+            final local = Mascota.fromJson(Map<String, dynamic>.from(item));
             if (local.id != null) {
               localesPorId[local.id!] = local;
             }
           }
         } catch (_) {
-          // Ignoramos datos locales antiguos o dañados.
+          // Ignoramos datos locales antiguos o daÃ±ados.
         }
       }
 
       final lista = await ApiService.obtenerMascotas();
 
       mascotas = lista.map((item) {
-        var remota = Mascota.fromJson(
-          Map<String, dynamic>.from(item),
-        );
+        var remota = Mascota.fromJson(Map<String, dynamic>.from(item));
 
-        final local =
-            remota.id == null ? null : localesPorId[remota.id!];
+        final local = remota.id == null ? null : localesPorId[remota.id!];
 
         if (local != null) {
           remota = remota.copyWith(
             edad: local.edad,
             peso: local.peso,
-            imagenPath: local.imagenPath,
+            imagenPath:
+                remota.imagenPath != null && remota.imagenPath!.isNotEmpty
+                ? remota.imagenPath
+                : local.imagenPath,
           );
         }
 
@@ -988,20 +831,14 @@ Future<void> cargarMascotas() async {
 
       await guardarMascotas();
 
-      debugPrint(
-        'Mascotas recibidas del backend: ${mascotas.length}',
-      );
+      debugPrint('Mascotas recibidas del backend: ${mascotas.length}');
     } catch (e) {
       debugPrint('ERROR AL CARGAR MASCOTAS: $e');
 
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'No se pudieron cargar las mascotas: $e',
-              ),
-            ),
+            SnackBar(content: Text('No se pudieron cargar las mascotas: $e')),
           );
         });
       }
@@ -1017,14 +854,9 @@ Future<void> cargarMascotas() async {
   Future<void> guardarMascotas() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final datos = mascotas
-        .map((mascota) => mascota.toJson())
-        .toList();
+    final datos = mascotas.map((mascota) => mascota.toJson()).toList();
 
-    await prefs.setString(
-      storageKey,
-      jsonEncode(datos),
-    );
+    await prefs.setString(storageKey, jsonEncode(datos));
   }
 
   Future<void> agregarMascota(Mascota mascota) async {
@@ -1035,6 +867,7 @@ Future<void> cargarMascotas() async {
         raza: mascota.raza,
         sexo: mascota.sexo,
         color: mascota.color,
+        fotoUrl: mascota.imagenPath,
       );
 
       final creada = Mascota.fromJson(data).copyWith(
@@ -1054,26 +887,19 @@ Future<void> cargarMascotas() async {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
       rethrow;
     }
   }
 
-  Future<void> editarMascota(
-    int index,
-    Mascota mascotaActualizada,
-  ) async {
+  Future<void> editarMascota(int index, Mascota mascotaActualizada) async {
     if (index < 0 || index >= mascotas.length) return;
 
     final original = mascotas[index];
 
     if (original.id == null) {
-      throw Exception('La mascota no tiene un ID válido.');
+      throw Exception('La mascota no tiene un ID vÃ¡lido.');
     }
 
     try {
@@ -1084,6 +910,7 @@ Future<void> cargarMascotas() async {
         raza: mascotaActualizada.raza,
         sexo: mascotaActualizada.sexo,
         color: mascotaActualizada.color,
+        fotoUrl: mascotaActualizada.imagenPath,
       );
 
       final actualizada = Mascota.fromJson(data).copyWith(
@@ -1104,11 +931,7 @@ Future<void> cargarMascotas() async {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
       rethrow;
     }
@@ -1120,7 +943,7 @@ Future<void> cargarMascotas() async {
     final mascota = mascotas[index];
 
     if (mascota.id == null) {
-      throw Exception('La mascota no tiene un ID válido.');
+      throw Exception('La mascota no tiene un ID vÃ¡lido.');
     }
 
     try {
@@ -1137,26 +960,19 @@ Future<void> cargarMascotas() async {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
       rethrow;
     }
   }
 
-  Future<void> cambiarEstadoExtravio(
-    int index,
-    bool extraviada,
-  ) async {
+  Future<void> cambiarEstadoExtravio(int index, bool extraviada) async {
     if (index < 0 || index >= mascotas.length) return;
 
     final mascota = mascotas[index];
 
     if (mascota.id == null) {
-      throw Exception('La mascota no tiene un ID válido.');
+      throw Exception('La mascota no tiene un ID vÃ¡lido.');
     }
 
     try {
@@ -1183,17 +999,13 @@ Future<void> cargarMascotas() async {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-          ),
-        ),
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
       rethrow;
     }
   }
 
-    void cambiarPagina(int index) {
+  void cambiarPagina(int index) {
     setState(() {
       paginaActual = index;
     });
@@ -1202,11 +1014,7 @@ Future<void> cargarMascotas() async {
   @override
   Widget build(BuildContext context) {
     if (cargando) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final paginas = [
@@ -1222,73 +1030,47 @@ Future<void> cargarMascotas() async {
         onEliminarMascota: eliminarMascota,
         onEstadoExtravio: cambiarEstadoExtravio,
       ),
-      UbicacionPage(
-        mascotas: mascotas,
-      ),
-      AlertasPage(
-        mascotas: mascotas,
-      ),
+      UbicacionPage(mascotas: mascotas),
+      AlertasPage(mascotas: mascotas),
       const PerfilPage(),
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: paginaActual,
-        children: paginas,
-      ),
+      body: IndexedStack(index: paginaActual, children: paginas),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: TaggyColors.surface,
-          border: Border(
-            top: BorderSide(
-              color: Color(0xFF182A42),
-            ),
-          ),
+          border: Border(top: BorderSide(color: Color(0xFFE5E5EA))),
         ),
         child: NavigationBar(
           backgroundColor: TaggyColors.surface,
-          indicatorColor: TaggyColors.blue.withOpacity(0.20),
+          indicatorColor: Colors.transparent,
           selectedIndex: paginaActual,
           onDestinationSelected: cambiarPagina,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(
-                Icons.home_rounded,
-                color: TaggyColors.lightBlue,
-              ),
+              selectedIcon: Icon(Icons.home_rounded, color: TaggyColors.blue),
               label: 'Inicio',
             ),
             NavigationDestination(
               icon: Icon(Icons.pets_outlined),
-              selectedIcon: Icon(
-                Icons.pets,
-                color: TaggyColors.lightBlue,
-              ),
+              selectedIcon: Icon(Icons.pets, color: TaggyColors.lightBlue),
               label: 'Mascotas',
             ),
             NavigationDestination(
               icon: Icon(Icons.location_on_outlined),
-              selectedIcon: Icon(
-                Icons.location_on,
-                color: TaggyColors.lightBlue,
-              ),
-              label: 'Ubicación',
+              selectedIcon: Icon(Icons.location_on, color: TaggyColors.blue),
+              label: 'UbicaciÃ³n',
             ),
             NavigationDestination(
               icon: Icon(Icons.notifications_outlined),
-              selectedIcon: Icon(
-                Icons.notifications,
-                color: TaggyColors.lightBlue,
-              ),
+              selectedIcon: Icon(Icons.notifications, color: TaggyColors.blue),
               label: 'Alertas',
             ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(
-                Icons.person,
-                color: TaggyColors.lightBlue,
-              ),
+              selectedIcon: Icon(Icons.person, color: TaggyColors.lightBlue),
               label: 'Perfil',
             ),
           ],
@@ -1307,10 +1089,7 @@ class InicioPage extends StatelessWidget {
 
   final Function(int) onCambiarPagina;
 
-  final Future<void> Function(
-    int index,
-    bool extraviada,
-  ) onEstadoExtravio;
+  final Future<void> Function(int index, bool extraviada) onEstadoExtravio;
 
   const InicioPage({
     super.key,
@@ -1321,37 +1100,65 @@ class InicioPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Mascota? mascota =
-        mascotas.isNotEmpty ? mascotas.first : null;
+    final Mascota? mascota = mascotas.isNotEmpty ? mascotas.first : null;
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 35),
         children: [
-          const TaggyLogo(),
-
-          const SizedBox(height: 24),
-
-          const Text(
-            'Hola 👋',
-            style: TextStyle(
-              color: TaggyColors.textSecondary,
-              fontSize: 16,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Inicio',
+                      style: TextStyle(
+                        color: TaggyColors.textPrimary,
+                        fontSize: 34,
+                        height: 1.05,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                    SizedBox(height: 7),
+                    Text(
+                      'Tu mascota, siempre cerca.',
+                      style: TextStyle(
+                        color: TaggyColors.textSecondary,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: TaggyColors.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: TaggyColors.separator),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.pets_rounded,
+                  color: TaggyColors.blue,
+                  size: 23,
+                ),
+              ),
+            ],
           ),
 
-          const SizedBox(height: 3),
-
-          const Text(
-            'Bienvenido a TAGGY',
-            style: TextStyle(
-              color: TaggyColors.textPrimary,
-              fontSize: 25,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 25),
+          const SizedBox(height: 28),
 
           if (mascota == null)
             EmptyMascotasCard(
@@ -1359,105 +1166,141 @@ class InicioPage extends StatelessWidget {
                 onCambiarPagina(1);
               },
             )
-          else
-            MascotaPrincipalCard(
-              mascota: mascota,
+          else ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: mascota.extraviada
+                    ? TaggyColors.red.withValues(alpha: 0.09)
+                    : TaggyColors.green.withValues(alpha: 0.09),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    mascota.extraviada
+                        ? Icons.warning_amber_rounded
+                        : Icons.check_circle_rounded,
+                    color: mascota.extraviada
+                        ? TaggyColors.red
+                        : TaggyColors.green,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      mascota.extraviada
+                          ? 'ExtravÃ­o activo para ${mascota.nombre}'
+                          : '${mascota.nombre} estÃ¡ segura',
+                      style: TextStyle(
+                        color: mascota.extraviada
+                            ? TaggyColors.red
+                            : const Color(0xFF248A3D),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
-          const SizedBox(height: 28),
+            const SizedBox(height: 14),
 
-          const SectionTitle(
-            titulo: 'Accesos rápidos',
-          ),
+            MascotaPrincipalCard(mascota: mascota),
 
-          const SizedBox(height: 15),
+            const SizedBox(height: 18),
 
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.25,
-            children: [
-              QuickActionCard(
-                titulo: 'Ubicación',
-                subtitulo: 'Ver posición',
-                icono: Icons.location_on_rounded,
-                color: TaggyColors.blue,
-                onTap: () {
-                  onCambiarPagina(2);
-                },
-              ),
-              QuickActionCard(
-                titulo: 'Extravío',
-                subtitulo: 'Modo perdido',
-                icono: Icons.warning_amber_rounded,
-                color: TaggyColors.red,
-                onTap: mascota == null
-                    ? null
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ExtravioPage(
-                              mascota: mascota,
-                              onEstadoChanged: (estado) {
-                                return onEstadoExtravio(
-                                  0,
-                                  estado,
-                                );
-                              },
-                            ),
-                          ),
-                        );
-                      },
-              ),
-              QuickActionCard(
-                titulo: 'Código QR',
-                subtitulo: 'Perfil público',
-                icono: Icons.qr_code_2_rounded,
-                color: TaggyColors.cyan,
-                onTap: mascota == null
-                    ? null
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => QrPage(
-                              mascota: mascota,
-                            ),
-                          ),
-                        );
-                      },
-              ),
-              QuickActionCard(
-                titulo: 'Seguridad',
-                subtitulo: 'Antirrobo',
-                icono: Icons.shield_outlined,
-                color: TaggyColors.orange,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const SeguridadPage(),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      onCambiarPagina(2);
+                    },
+                    icon: const Icon(Icons.location_on_rounded, size: 20),
+                    label: const Text('UbicaciÃ³n'),
+                  ),
+                ),
+
+                const SizedBox(width: 12),
+
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: TaggyColors.red,
                     ),
-                  );
-                },
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ExtravioPage(
+                            mascota: mascota,
+                            onEstadoChanged: (estado) {
+                              return onEstadoExtravio(0, estado);
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.warning_amber_rounded, size: 20),
+                    label: Text(mascota.extraviada ? 'ExtravÃ­o' : 'Reportar'),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 30),
+
+            const Text(
+              'MÃ¡s',
+              style: TextStyle(
+                color: TaggyColors.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
               ),
-            ],
-          ),
+            ),
 
-          const SizedBox(height: 28),
+            const SizedBox(height: 14),
 
-          const SectionTitle(
-            titulo: 'Estado del dispositivo',
-          ),
-
-          const SizedBox(height: 15),
-
-          const DeviceStatusCard(),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.35,
+              children: [
+                QuickActionCard(
+                  titulo: 'CÃ³digo QR',
+                  subtitulo: 'Perfil pÃºblico',
+                  icono: Icons.qr_code_2_rounded,
+                  color: TaggyColors.blue,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => QrPage(mascota: mascota),
+                      ),
+                    );
+                  },
+                ),
+                QuickActionCard(
+                  titulo: 'Seguridad',
+                  subtitulo: 'ProtecciÃ³n TAGGY',
+                  icono: Icons.shield_outlined,
+                  color: TaggyColors.green,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SeguridadPage()),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1471,21 +1314,13 @@ class InicioPage extends StatelessWidget {
 class MascotasPage extends StatelessWidget {
   final List<Mascota> mascotas;
 
-  final Future<void> Function(Mascota mascota)
-      onAgregarMascota;
+  final Future<void> Function(Mascota mascota) onAgregarMascota;
 
-  final Future<void> Function(
-    int index,
-    Mascota mascota,
-  ) onEditarMascota;
+  final Future<void> Function(int index, Mascota mascota) onEditarMascota;
 
-  final Future<void> Function(int index)
-      onEliminarMascota;
+  final Future<void> Function(int index) onEliminarMascota;
 
-  final Future<void> Function(
-    int index,
-    bool extraviada,
-  ) onEstadoExtravio;
+  final Future<void> Function(int index, bool extraviada) onEstadoExtravio;
 
   const MascotasPage({
     super.key,
@@ -1496,16 +1331,10 @@ class MascotasPage extends StatelessWidget {
     required this.onEstadoExtravio,
   });
 
-  Future<void> abrirAgregarMascota(
-    BuildContext context,
-  ) async {
-    final nuevaMascota =
-        await Navigator.push<Mascota>(
+  Future<void> abrirAgregarMascota(BuildContext context) async {
+    final nuevaMascota = await Navigator.push<Mascota>(
       context,
-      MaterialPageRoute(
-        builder: (_) =>
-            const AgregarMascotaPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const AgregarMascotaPage()),
     );
 
     if (nuevaMascota == null) {
@@ -1519,9 +1348,7 @@ class MascotasPage extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: TaggyColors.surfaceLight,
-            content: Text(
-              '${nuevaMascota.nombre} fue agregada correctamente.',
-            ),
+            content: Text('${nuevaMascota.nombre} fue agregada correctamente.'),
           ),
         );
       }
@@ -1534,15 +1361,9 @@ class MascotasPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          10,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const TaggyLogo(),
 
@@ -1552,47 +1373,37 @@ class MascotasPage extends StatelessWidget {
               children: [
                 const Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Mis mascotas',
                         style: TextStyle(
                           fontSize: 28,
-                          fontWeight:
-                              FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       SizedBox(height: 4),
                       Text(
                         'Administra tus mascotas',
-                        style: TextStyle(
-                          color: TaggyColors
-                              .textSecondary,
-                        ),
+                        style: TextStyle(color: TaggyColors.textSecondary),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(
+                  padding: const EdgeInsets.symmetric(
                     horizontal: 13,
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: TaggyColors.blue
-                        .withOpacity(0.15),
-                    borderRadius:
-                        BorderRadius.circular(20),
+                    color: TaggyColors.blue.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     '${mascotas.length}',
                     style: const TextStyle(
-                      color:
-                          TaggyColors.lightBlue,
-                      fontWeight:
-                          FontWeight.bold,
+                      color: TaggyColors.blue,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -1606,24 +1417,14 @@ class MascotasPage extends StatelessWidget {
                   ? const Center(
                       child: Text(
                         'No tienes mascotas registradas.',
-                        style: TextStyle(
-                          color: TaggyColors
-                              .textSecondary,
-                        ),
+                        style: TextStyle(color: TaggyColors.textSecondary),
                       ),
                     )
                   : ListView.separated(
-                      itemCount:
-                          mascotas.length,
-                      separatorBuilder:
-                          (_, __) =>
-                              const SizedBox(
-                        height: 12,
-                      ),
-                      itemBuilder:
-                          (context, index) {
-                        final mascota =
-                            mascotas[index];
+                      itemCount: mascotas.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final mascota = mascotas[index];
 
                         return MascotaListCard(
                           mascota: mascota,
@@ -1631,29 +1432,16 @@ class MascotasPage extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    DetalleMascotaPage(
-                                  mascota:
-                                      mascota,
-                                  onEditar:
-                                      (actualizada) {
-                                    return onEditarMascota(
-                                      index,
-                                      actualizada,
-                                    );
+                                builder: (_) => DetalleMascotaPage(
+                                  mascota: mascota,
+                                  onEditar: (actualizada) {
+                                    return onEditarMascota(index, actualizada);
                                   },
-                                  onEliminar:
-                                      () {
-                                    return onEliminarMascota(
-                                      index,
-                                    );
+                                  onEliminar: () {
+                                    return onEliminarMascota(index);
                                   },
-                                  onEstadoChanged:
-                                      (estado) {
-                                    return onEstadoExtravio(
-                                      index,
-                                      estado,
-                                    );
+                                  onEstadoChanged: (estado) {
+                                    return onEstadoExtravio(index, estado);
                                   },
                                 ),
                               ),
@@ -1671,18 +1459,12 @@ class MascotasPage extends StatelessWidget {
               height: 54,
               child: FilledButton.icon(
                 onPressed: () {
-                  abrirAgregarMascota(
-                    context,
-                  );
+                  abrirAgregarMascota(context);
                 },
-                icon:
-                    const Icon(Icons.add),
+                icon: const Icon(Icons.add),
                 label: const Text(
                   'Agregar mascota',
-                  style: TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -1697,41 +1479,32 @@ class MascotasPage extends StatelessWidget {
 // AGREGAR MASCOTA
 // ======================================================
 
-class AgregarMascotaPage
-    extends StatefulWidget {
+class AgregarMascotaPage extends StatefulWidget {
   const AgregarMascotaPage({super.key});
 
   @override
-  State<AgregarMascotaPage> createState() =>
-      _AgregarMascotaPageState();
+  State<AgregarMascotaPage> createState() => _AgregarMascotaPageState();
 }
 
-class _AgregarMascotaPageState
-    extends State<AgregarMascotaPage> {
+class _AgregarMascotaPageState extends State<AgregarMascotaPage> {
   final formKey = GlobalKey<FormState>();
 
-  final nombreController =
-      TextEditingController();
+  final nombreController = TextEditingController();
 
-  final razaController =
-      TextEditingController();
+  final razaController = TextEditingController();
 
-  final edadController =
-      TextEditingController();
+  final edadController = TextEditingController();
 
-  final colorController =
-      TextEditingController();
+  final colorController = TextEditingController();
 
-  final pesoController =
-      TextEditingController();
+  final pesoController = TextEditingController();
 
   String especie = 'Perro';
   String sexo = 'Macho';
   String? imagenPath;
 
   Future<void> agregarFoto() async {
-    final nuevaImagen =
-        await seleccionarYGuardarImagen(context);
+    final nuevaImagen = await seleccionarYGuardarImagen(context);
 
     if (nuevaImagen == null || !mounted) {
       return;
@@ -1747,13 +1520,9 @@ class _AgregarMascotaPageState
       return;
     }
 
-    final timestamp = DateTime.now()
-        .millisecondsSinceEpoch
-        .toString();
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
 
-    final codigo = timestamp.substring(
-      timestamp.length - 6,
-    );
+    final codigo = timestamp.substring(timestamp.length - 6);
 
     final mascota = Mascota(
       nombre: nombreController.text.trim(),
@@ -1767,10 +1536,7 @@ class _AgregarMascotaPageState
       imagenPath: imagenPath,
     );
 
-    Navigator.pop(
-      context,
-      mascota,
-    );
+    Navigator.pop(context, mascota);
   }
 
   @override
@@ -1787,10 +1553,7 @@ class _AgregarMascotaPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title:
-            const Text('Nueva mascota'),
-      ),
+      appBar: AppBar(title: const Text('Nueva mascota')),
       body: Form(
         key: formKey,
         child: ListView(
@@ -1804,10 +1567,7 @@ class _AgregarMascotaPageState
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        PetAvatar(
-                          size: 118,
-                          imagenPath: imagenPath,
-                        ),
+                        PetAvatar(size: 118, imagenPath: imagenPath),
                         Positioned(
                           right: -2,
                           bottom: 2,
@@ -1841,13 +1601,11 @@ class _AgregarMascotaPageState
                           : Icons.edit_outlined,
                     ),
                     label: Text(
-                      imagenPath == null
-                          ? 'Agregar foto'
-                          : 'Cambiar foto',
+                      imagenPath == null ? 'Agregar foto' : 'Cambiar foto',
                     ),
                   ),
                   const Text(
-                    'Puedes elegir una imagen de tu galería o usar la cámara.',
+                    'Puedes elegir una imagen de tu galerÃ­a o usar la cÃ¡mara.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: TaggyColors.textSecondary,
@@ -1876,18 +1634,9 @@ class _AgregarMascotaPageState
                 prefixIcon: Icon(Icons.pets),
               ),
               items: const [
-                DropdownMenuItem(
-                  value: 'Perro',
-                  child: Text('Perro'),
-                ),
-                DropdownMenuItem(
-                  value: 'Gato',
-                  child: Text('Gato'),
-                ),
-                DropdownMenuItem(
-                  value: 'Otro',
-                  child: Text('Otro'),
-                ),
+                DropdownMenuItem(value: 'Perro', child: Text('Perro')),
+                DropdownMenuItem(value: 'Gato', child: Text('Gato')),
+                DropdownMenuItem(value: 'Otro', child: Text('Otro')),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -1912,7 +1661,7 @@ class _AgregarMascotaPageState
             CampoMascota(
               controller: edadController,
               label: 'Edad',
-              hint: 'Ejemplo: 3 años',
+              hint: 'Ejemplo: 3 aÃ±os',
               icono: Icons.cake_outlined,
             ),
 
@@ -1920,22 +1669,13 @@ class _AgregarMascotaPageState
 
             DropdownButtonFormField<String>(
               initialValue: sexo,
-              decoration:
-                  const InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Sexo',
-                prefixIcon: Icon(
-                  Icons.info_outline,
-                ),
+                prefixIcon: Icon(Icons.info_outline),
               ),
               items: const [
-                DropdownMenuItem(
-                  value: 'Macho',
-                  child: Text('Macho'),
-                ),
-                DropdownMenuItem(
-                  value: 'Hembra',
-                  child: Text('Hembra'),
-                ),
+                DropdownMenuItem(value: 'Macho', child: Text('Macho')),
+                DropdownMenuItem(value: 'Hembra', child: Text('Hembra')),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -1951,8 +1691,7 @@ class _AgregarMascotaPageState
             CampoMascota(
               controller: colorController,
               label: 'Color',
-              icono:
-                  Icons.palette_outlined,
+              icono: Icons.palette_outlined,
             ),
 
             const SizedBox(height: 15),
@@ -1961,8 +1700,7 @@ class _AgregarMascotaPageState
               controller: pesoController,
               label: 'Peso',
               hint: 'Ejemplo: 28 kg',
-              icono:
-                  Icons.monitor_weight_outlined,
+              icono: Icons.monitor_weight_outlined,
             ),
 
             const SizedBox(height: 30),
@@ -1971,14 +1709,10 @@ class _AgregarMascotaPageState
               height: 55,
               child: FilledButton.icon(
                 onPressed: guardar,
-                icon:
-                    const Icon(Icons.save),
+                icon: const Icon(Icons.save),
                 label: const Text(
                   'Guardar mascota',
-                  style: TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -1993,19 +1727,14 @@ class _AgregarMascotaPageState
 // DETALLE
 // ======================================================
 
-class DetalleMascotaPage
-    extends StatefulWidget {
+class DetalleMascotaPage extends StatefulWidget {
   final Mascota mascota;
 
-  final Future<void> Function(
-    Mascota mascota,
-  ) onEditar;
+  final Future<void> Function(Mascota mascota) onEditar;
 
-  final Future<void> Function()
-      onEliminar;
+  final Future<void> Function() onEliminar;
 
-  final Future<void> Function(bool estado)
-      onEstadoChanged;
+  final Future<void> Function(bool estado) onEstadoChanged;
 
   const DetalleMascotaPage({
     super.key,
@@ -2016,12 +1745,10 @@ class DetalleMascotaPage
   });
 
   @override
-  State<DetalleMascotaPage> createState() =>
-      _DetalleMascotaPageState();
+  State<DetalleMascotaPage> createState() => _DetalleMascotaPageState();
 }
 
-class _DetalleMascotaPageState
-    extends State<DetalleMascotaPage> {
+class _DetalleMascotaPageState extends State<DetalleMascotaPage> {
   late Mascota mascota;
 
   @override
@@ -2031,14 +1758,9 @@ class _DetalleMascotaPageState
   }
 
   Future<void> editar() async {
-    final actualizada =
-        await Navigator.push<Mascota>(
+    final actualizada = await Navigator.push<Mascota>(
       context,
-      MaterialPageRoute(
-        builder: (_) => EditarMascotaPage(
-          mascota: mascota,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => EditarMascotaPage(mascota: mascota)),
     );
 
     if (actualizada == null) {
@@ -2059,19 +1781,14 @@ class _DetalleMascotaPageState
   }
 
   Future<void> cambiarExtravio() async {
-    final nuevoEstado =
-        !mascota.extraviada;
+    final nuevoEstado = !mascota.extraviada;
 
     try {
-      await widget.onEstadoChanged(
-        nuevoEstado,
-      );
+      await widget.onEstadoChanged(nuevoEstado);
 
       if (mounted) {
         setState(() {
-          mascota = mascota.copyWith(
-            extraviada: nuevoEstado,
-          );
+          mascota = mascota.copyWith(extraviada: nuevoEstado);
         });
       }
     } catch (_) {
@@ -2080,44 +1797,26 @@ class _DetalleMascotaPageState
   }
 
   Future<void> eliminar() async {
-    final confirmado =
-        await showDialog<bool>(
+    final confirmado = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor:
-              TaggyColors.surface,
-          title: const Text(
-            'Eliminar mascota',
-          ),
-          content: Text(
-            '¿Seguro que deseas eliminar a ${mascota.nombre}?',
-          ),
+          backgroundColor: TaggyColors.surface,
+          title: const Text('Eliminar mascota'),
+          content: Text('Â¿Seguro que deseas eliminar a ${mascota.nombre}?'),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
+                Navigator.pop(dialogContext, false);
               },
-              child:
-                  const Text('Cancelar'),
+              child: const Text('Cancelar'),
             ),
             FilledButton(
-              style:
-                  FilledButton.styleFrom(
-                backgroundColor:
-                    TaggyColors.red,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: TaggyColors.red),
               onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
+                Navigator.pop(dialogContext, true);
               },
-              child:
-                  const Text('Eliminar'),
+              child: const Text('Eliminar'),
             ),
           ],
         );
@@ -2142,82 +1841,55 @@ class _DetalleMascotaPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(mascota.nombre),
-      ),
+      appBar: AppBar(title: Text(mascota.nombre)),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Center(
-            child: PetAvatar(
-              size: 120,
-              imagenPath: mascota.imagenPath,
-            ),
-          ),
+          Center(child: PetAvatar(size: 120, imagenPath: mascota.imagenPath)),
 
           const SizedBox(height: 20),
 
           Center(
             child: Text(
               mascota.nombre,
-              style: const TextStyle(
-                fontSize: 30,
-                fontWeight:
-                    FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
             ),
           ),
 
           const SizedBox(height: 8),
 
-          Center(
-            child: StatusBadge(
-              extraviada:
-                  mascota.extraviada,
-            ),
-          ),
+          Center(child: StatusBadge(extraviada: mascota.extraviada)),
 
           const SizedBox(height: 30),
 
           InfoCard(
             icono: Icons.category,
             titulo: 'Raza',
-            valor: valorSeguro(
-              mascota.raza,
-            ),
+            valor: valorSeguro(mascota.raza),
           ),
 
           InfoCard(
             icono: Icons.cake,
             titulo: 'Edad',
-            valor: valorSeguro(
-              mascota.edad,
-            ),
+            valor: valorSeguro(mascota.edad),
           ),
 
           InfoCard(
             icono: Icons.info_outline,
             titulo: 'Sexo',
-            valor: valorSeguro(
-              mascota.sexo,
-            ),
+            valor: valorSeguro(mascota.sexo),
           ),
 
           InfoCard(
             icono: Icons.palette,
             titulo: 'Color',
-            valor: valorSeguro(
-              mascota.color,
-            ),
+            valor: valorSeguro(mascota.color),
           ),
 
           InfoCard(
-            icono:
-                Icons.monitor_weight,
+            icono: Icons.monitor_weight,
             titulo: 'Peso',
-            valor: valorSeguro(
-              mascota.peso,
-            ),
+            valor: valorSeguro(mascota.peso),
           ),
 
           InfoCard(
@@ -2232,11 +1904,8 @@ class _DetalleMascotaPageState
             height: 52,
             child: FilledButton.icon(
               onPressed: editar,
-              icon:
-                  const Icon(Icons.edit),
-              label: const Text(
-                'Editar mascota',
-              ),
+              icon: const Icon(Icons.edit),
+              label: const Text('Editar mascota'),
             ),
           ),
 
@@ -2244,14 +1913,10 @@ class _DetalleMascotaPageState
 
           SizedBox(
             height: 52,
-            child:
-                FilledButton.tonalIcon(
-              onPressed:
-                  cambiarExtravio,
+            child: FilledButton.tonalIcon(
+              onPressed: cambiarExtravio,
               icon: Icon(
-                mascota.extraviada
-                    ? Icons.check_circle
-                    : Icons.warning_amber,
+                mascota.extraviada ? Icons.check_circle : Icons.warning_amber,
               ),
               label: Text(
                 mascota.extraviada
@@ -2266,21 +1931,13 @@ class _DetalleMascotaPageState
           SizedBox(
             height: 52,
             child: OutlinedButton.icon(
-              style:
-                  OutlinedButton.styleFrom(
-                foregroundColor:
-                    TaggyColors.red,
-                side: const BorderSide(
-                  color:
-                      TaggyColors.red,
-                ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: TaggyColors.red,
+                side: const BorderSide(color: TaggyColors.red),
               ),
               onPressed: eliminar,
-              icon:
-                  const Icon(Icons.delete),
-              label: const Text(
-                'Eliminar mascota',
-              ),
+              icon: const Icon(Icons.delete),
+              label: const Text('Eliminar mascota'),
             ),
           ),
         ],
@@ -2293,22 +1950,16 @@ class _DetalleMascotaPageState
 // EDITAR MASCOTA
 // ======================================================
 
-class EditarMascotaPage
-    extends StatefulWidget {
+class EditarMascotaPage extends StatefulWidget {
   final Mascota mascota;
 
-  const EditarMascotaPage({
-    super.key,
-    required this.mascota,
-  });
+  const EditarMascotaPage({super.key, required this.mascota});
 
   @override
-  State<EditarMascotaPage> createState() =>
-      _EditarMascotaPageState();
+  State<EditarMascotaPage> createState() => _EditarMascotaPageState();
 }
 
-class _EditarMascotaPageState
-    extends State<EditarMascotaPage> {
+class _EditarMascotaPageState extends State<EditarMascotaPage> {
   final formKey = GlobalKey<FormState>();
 
   late TextEditingController nombreController;
@@ -2325,45 +1976,25 @@ class _EditarMascotaPageState
   void initState() {
     super.initState();
 
-    nombreController =
-        TextEditingController(
-      text: widget.mascota.nombre,
-    );
+    nombreController = TextEditingController(text: widget.mascota.nombre);
 
-    razaController =
-        TextEditingController(
-      text: widget.mascota.raza,
-    );
+    razaController = TextEditingController(text: widget.mascota.raza);
 
-    edadController =
-        TextEditingController(
-      text: widget.mascota.edad,
-    );
+    edadController = TextEditingController(text: widget.mascota.edad);
 
-    colorController =
-        TextEditingController(
-      text: widget.mascota.color,
-    );
+    colorController = TextEditingController(text: widget.mascota.color);
 
-    pesoController =
-        TextEditingController(
-      text: widget.mascota.peso,
-    );
+    pesoController = TextEditingController(text: widget.mascota.peso);
 
-    especie = widget.mascota.especie.isEmpty
-        ? 'Perro'
-        : widget.mascota.especie;
+    especie = widget.mascota.especie.isEmpty ? 'Perro' : widget.mascota.especie;
 
-    sexo = widget.mascota.sexo == 'Hembra'
-        ? 'Hembra'
-        : 'Macho';
+    sexo = widget.mascota.sexo == 'Hembra' ? 'Hembra' : 'Macho';
 
     imagenPath = widget.mascota.imagenPath;
   }
 
   Future<void> cambiarFoto() async {
-    final nuevaImagen =
-        await seleccionarYGuardarImagen(context);
+    final nuevaImagen = await seleccionarYGuardarImagen(context);
 
     if (nuevaImagen == null || !mounted) {
       return;
@@ -2379,8 +2010,7 @@ class _EditarMascotaPageState
       return;
     }
 
-    final actualizada =
-        widget.mascota.copyWith(
+    final actualizada = widget.mascota.copyWith(
       nombre: nombreController.text.trim(),
       especie: especie,
       raza: razaController.text.trim(),
@@ -2391,10 +2021,7 @@ class _EditarMascotaPageState
       imagenPath: imagenPath,
     );
 
-    Navigator.pop(
-      context,
-      actualizada,
-    );
+    Navigator.pop(context, actualizada);
   }
 
   @override
@@ -2411,15 +2038,11 @@ class _EditarMascotaPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title:
-            const Text('Editar mascota'),
-      ),
+      appBar: AppBar(title: const Text('Editar mascota')),
       body: Form(
         key: formKey,
         child: ListView(
-          padding:
-              const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           children: [
             Center(
               child: Column(
@@ -2429,10 +2052,7 @@ class _EditarMascotaPageState
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        PetAvatar(
-                          size: 112,
-                          imagenPath: imagenPath,
-                        ),
+                        PetAvatar(size: 112, imagenPath: imagenPath),
                         Positioned(
                           right: -2,
                           bottom: 2,
@@ -2460,13 +2080,9 @@ class _EditarMascotaPageState
                   const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: cambiarFoto,
-                    icon: const Icon(
-                      Icons.photo_library_outlined,
-                    ),
+                    icon: const Icon(Icons.photo_library_outlined),
                     label: Text(
-                      imagenPath == null
-                          ? 'Agregar foto'
-                          : 'Cambiar foto',
+                      imagenPath == null ? 'Agregar foto' : 'Cambiar foto',
                     ),
                   ),
                 ],
@@ -2476,8 +2092,7 @@ class _EditarMascotaPageState
             const SizedBox(height: 20),
 
             CampoMascota(
-              controller:
-                  nombreController,
+              controller: nombreController,
               label: 'Nombre',
               icono: Icons.pets,
               requerido: true,
@@ -2492,18 +2107,9 @@ class _EditarMascotaPageState
                 prefixIcon: Icon(Icons.pets),
               ),
               items: const [
-                DropdownMenuItem(
-                  value: 'Perro',
-                  child: Text('Perro'),
-                ),
-                DropdownMenuItem(
-                  value: 'Gato',
-                  child: Text('Gato'),
-                ),
-                DropdownMenuItem(
-                  value: 'Otro',
-                  child: Text('Otro'),
-                ),
+                DropdownMenuItem(value: 'Perro', child: Text('Perro')),
+                DropdownMenuItem(value: 'Gato', child: Text('Gato')),
+                DropdownMenuItem(value: 'Otro', child: Text('Otro')),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -2519,8 +2125,7 @@ class _EditarMascotaPageState
             CampoMascota(
               controller: razaController,
               label: 'Raza',
-              icono:
-                  Icons.category_outlined,
+              icono: Icons.category_outlined,
               requerido: true,
             ),
 
@@ -2529,29 +2134,20 @@ class _EditarMascotaPageState
             CampoMascota(
               controller: edadController,
               label: 'Edad',
-              icono:
-                  Icons.cake_outlined,
+              icono: Icons.cake_outlined,
             ),
 
             const SizedBox(height: 15),
 
             DropdownButtonFormField<String>(
               initialValue: sexo,
-              decoration:
-                  const InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Sexo',
-                prefixIcon:
-                    Icon(Icons.info_outline),
+                prefixIcon: Icon(Icons.info_outline),
               ),
               items: const [
-                DropdownMenuItem(
-                  value: 'Macho',
-                  child: Text('Macho'),
-                ),
-                DropdownMenuItem(
-                  value: 'Hembra',
-                  child: Text('Hembra'),
-                ),
+                DropdownMenuItem(value: 'Macho', child: Text('Macho')),
+                DropdownMenuItem(value: 'Hembra', child: Text('Hembra')),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -2565,21 +2161,17 @@ class _EditarMascotaPageState
             const SizedBox(height: 15),
 
             CampoMascota(
-              controller:
-                  colorController,
+              controller: colorController,
               label: 'Color',
-              icono:
-                  Icons.palette_outlined,
+              icono: Icons.palette_outlined,
             ),
 
             const SizedBox(height: 15),
 
             CampoMascota(
-              controller:
-                  pesoController,
+              controller: pesoController,
               label: 'Peso',
-              icono: Icons
-                  .monitor_weight_outlined,
+              icono: Icons.monitor_weight_outlined,
             ),
 
             const SizedBox(height: 30),
@@ -2588,11 +2180,8 @@ class _EditarMascotaPageState
               height: 54,
               child: FilledButton.icon(
                 onPressed: guardar,
-                icon:
-                    const Icon(Icons.save),
-                label: const Text(
-                  'Guardar cambios',
-                ),
+                icon: const Icon(Icons.save),
+                label: const Text('Guardar cambios'),
               ),
             ),
           ],
@@ -2603,178 +2192,969 @@ class _EditarMascotaPageState
 }
 
 // ======================================================
-// UBICACIÓN
+// UBICACIÃ“N
 // ======================================================
 
-class UbicacionPage extends StatelessWidget {
+class UbicacionPage extends StatefulWidget {
   final List<Mascota> mascotas;
 
-  const UbicacionPage({
-    super.key,
-    required this.mascotas,
-  });
+  const UbicacionPage({super.key, required this.mascotas});
+
+  @override
+  State<UbicacionPage> createState() => _UbicacionPageState();
+}
+
+class _UbicacionPageState extends State<UbicacionPage> {
+  Timer? _timerUbicacion;
+  Mascota? mascotaSeleccionada;
+  Map<String, dynamic>? datosUbicacion;
+  Map<String, dynamic>? geocerca;
+  bool guardandoZona = false;
+  bool seleccionandoCentroZona = false;
+  List<Map<String, dynamic>> historialUbicaciones = [];
+  int? horasHistorial;
+  bool cargandoHistorial = false;
+
+  bool cargando = true;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _timerUbicacion = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted || cargando) {
+        return;
+      }
+
+      if (mascotaSeleccionada != null) {
+        cargarUbicacion();
+      }
+    });
+
+    if (widget.mascotas.isNotEmpty) {
+      mascotaSeleccionada = widget.mascotas.first;
+      cargarUbicacion();
+    } else {
+      cargando = false;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant UbicacionPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.mascotas.isEmpty) {
+      setState(() {
+        mascotaSeleccionada = null;
+        datosUbicacion = null;
+        cargando = false;
+        error = null;
+      });
+
+      return;
+    }
+
+    final idActual = mascotaSeleccionada?.id;
+
+    final sigueExistiendo = widget.mascotas.any(
+      (mascota) => mascota.id == idActual,
+    );
+
+    if (!sigueExistiendo) {
+      mascotaSeleccionada = widget.mascotas.first;
+      cargarUbicacion();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timerUbicacion?.cancel();
+    super.dispose();
+  }
+
+  Future<void> cargarUbicacion() async {
+    final mascota = mascotaSeleccionada;
+
+    if (mascota == null || mascota.id == null) {
+      if (!mounted) return;
+
+      setState(() {
+        cargando = false;
+        datosUbicacion = null;
+        error = 'La mascota todavÃ­a no tiene un ID vÃ¡lido.';
+      });
+
+      return;
+    }
+
+    setState(() {
+      cargando = true;
+      error = null;
+    });
+
+    try {
+      final datos = await ApiService.obtenerUltimaUbicacion(mascota.id!);
+
+      Map<String, dynamic>? zona;
+
+      try {
+        zona = await ApiService.obtenerGeocerca(mascota.id!);
+      } catch (_) {
+        zona = geocerca;
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        datosUbicacion = datos;
+        geocerca = zona;
+        cargando = false;
+        error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        datosUbicacion = null;
+        cargando = false;
+        error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> cargarHistorial() async {
+    final mascota = mascotaSeleccionada;
+    final horas = horasHistorial;
+
+    if (mascota == null || mascota.id == null || horas == null) {
+      return;
+    }
+
+    setState(() {
+      cargandoHistorial = true;
+    });
+
+    try {
+      final datos = await ApiService.obtenerHistorialUbicaciones(
+        mascota.id!,
+        horas: horas,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        historialUbicaciones = datos;
+        cargandoHistorial = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        historialUbicaciones = [];
+        cargandoHistorial = false;
+      });
+
+      debugPrint('ERROR HISTORIAL GPS: $e');
+    }
+  }
+
+  Future<void> seleccionarPeriodo(int? horas) async {
+    setState(() {
+      horasHistorial = horas;
+
+      if (horas == null) {
+        historialUbicaciones = [];
+        cargandoHistorial = false;
+      }
+    });
+
+    if (horas != null) {
+      await cargarHistorial();
+    }
+  }
+
+  DateTime? _parsearFecha(dynamic valor) {
+    if (valor == null) return null;
+
+    try {
+      return DateTime.parse(valor.toString()).toLocal();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _tiempoRelativo(DateTime? fecha) {
+    if (fecha == null) {
+      return 'Sin dato';
+    }
+
+    var diferencia = DateTime.now().difference(fecha);
+
+    if (diferencia.isNegative) {
+      diferencia = Duration.zero;
+    }
+
+    if (diferencia.inSeconds < 60) {
+      return 'Ahora';
+    }
+
+    if (diferencia.inMinutes < 60) {
+      return 'Hace ${diferencia.inMinutes} min';
+    }
+
+    if (diferencia.inHours < 24) {
+      return 'Hace ${diferencia.inHours} h';
+    }
+
+    if (diferencia.inDays == 1) {
+      return 'Ayer';
+    }
+
+    return 'Hace ${diferencia.inDays} dÃ­as';
+  }
+
+  String _textoBateria(dynamic bateria) {
+    if (bateria == null) {
+      return 'Sin dato';
+    }
+
+    final numero = num.tryParse(bateria.toString());
+
+    if (numero == null) {
+      return 'Sin dato';
+    }
+
+    return '${numero.round()}%';
+  }
+
+  bool _conexionReciente(DateTime? fecha) {
+    if (fecha == null) {
+      return false;
+    }
+
+    final diferencia = DateTime.now().difference(fecha);
+
+    return !diferencia.isNegative && diferencia.inMinutes <= 10;
+  }
+
+  void _activarSeleccionCentroZona() {
+    setState(() {
+      seleccionandoCentroZona = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Toca en el mapa donde quieres colocar Casa.'),
+        duration: Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Future<void> _abrirConfigZonaSegura([LatLng? centroElegido]) async {
+    final mascota = mascotaSeleccionada;
+    final mascotaId = mascota?.id;
+
+    if (mascotaId == null) {
+      return;
+    }
+
+    final raw = datosUbicacion?['ubicacion'];
+
+    final latitud =
+        centroElegido?.latitude ??
+        (raw is Map ? double.tryParse(raw['latitud']?.toString() ?? '') : null);
+
+    final longitud =
+        centroElegido?.longitude ??
+        (raw is Map
+            ? double.tryParse(raw['longitud']?.toString() ?? '')
+            : null);
+
+    if (latitud == null || longitud == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo obtener una ubicaciÃ³n vÃ¡lida.'),
+        ),
+      );
+
+      return;
+    }
+
+    int radioSeleccionado =
+        int.tryParse(geocerca?['radio_metros']?.toString() ?? '') ?? 100;
+
+    final guardar = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.shield_outlined, color: TaggyColors.blue),
+                        SizedBox(width: 10),
+                        Text(
+                          'Configurar zona segura',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Text(
+                      'El punto elegido en el mapa serÃ¡ el centro de la zona segura.',
+                      style: const TextStyle(color: TaggyColors.textSecondary),
+                    ),
+
+                    const SizedBox(height: 22),
+
+                    const Text(
+                      'Radio de seguridad',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final radio in [50, 100, 200, 500])
+                          ChoiceChip(
+                            label: Text('$radio m'),
+                            selected: radioSeleccionado == radio,
+                            onSelected: (_) {
+                              setModalState(() {
+                                radioSeleccionado = radio;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context, true);
+                        },
+                        icon: const Icon(Icons.check),
+                        label: const Text('Guardar zona segura'),
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(context, false);
+                        },
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (guardar != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      guardandoZona = true;
+    });
+
+    try {
+      final zona = await ApiService.guardarGeocerca(
+        mascotaId: mascotaId,
+        latitud: latitud,
+        longitud: longitud,
+        radioMetros: radioSeleccionado,
+        nombre: 'Casa',
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        geocerca = zona;
+        guardandoZona = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Zona segura de $radioSeleccionado m guardada.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        guardandoZona = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  LatLng? _centroZonaSegura() {
+    final zona = geocerca;
+
+    if (zona == null) {
+      return null;
+    }
+
+    final latitud = double.tryParse(zona['latitud']?.toString() ?? '');
+
+    final longitud = double.tryParse(zona['longitud']?.toString() ?? '');
+
+    if (latitud == null || longitud == null) {
+      return null;
+    }
+
+    return LatLng(latitud, longitud);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final mascota =
-        mascotas.isNotEmpty ? mascotas.first : null;
+    final ubicacionRaw = datosUbicacion?['ubicacion'];
+
+    final dispositivoRaw = datosUbicacion?['dispositivo'];
+
+    final ubicacion = ubicacionRaw is Map
+        ? Map<String, dynamic>.from(ubicacionRaw)
+        : <String, dynamic>{};
+
+    final dispositivo = dispositivoRaw is Map
+        ? Map<String, dynamic>.from(dispositivoRaw)
+        : <String, dynamic>{};
+
+    final latitud = ubicacion['latitud']?.toString();
+
+    final longitud = ubicacion['longitud']?.toString();
+
+    final altitud = ubicacion['altitud']?.toString();
+
+    final fechaRecepcion = _parsearFecha(ubicacion['fecha_recepcion']);
+
+    final ultimaConexion = _parsearFecha(dispositivo['ultima_conexion']);
+
+    final tieneUbicacion =
+        latitud != null &&
+        latitud.isNotEmpty &&
+        longitud != null &&
+        longitud.isNotEmpty;
+
+    final cuatroGConectado = _conexionReciente(ultimaConexion);
+
+    final modo = dispositivo['modo']?.toString().trim() ?? '';
+
+    final bateria = _textoBateria(dispositivo['bateria']);
+    final puntosHistorial = <LatLng>[];
+
+    for (final punto in historialUbicaciones) {
+      final lat = double.tryParse(punto['latitud']?.toString() ?? '');
+
+      final lon = double.tryParse(punto['longitud']?.toString() ?? '');
+
+      if (lat != null && lon != null) {
+        puntosHistorial.add(LatLng(lat, lon));
+      }
+    }
 
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const TaggyLogo(),
+      child: RefreshIndicator(
+        onRefresh: cargarUbicacion,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          children: [
+            const TaggyLogo(),
 
-          const SizedBox(height: 25),
+            const SizedBox(height: 25),
 
-          const Text(
-            'Ubicación',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 5),
-
-          const Text(
-            'Seguimiento GPS del collar',
-            style: TextStyle(
-              color:
-                  TaggyColors.textSecondary,
-            ),
-          ),
-
-          const SizedBox(height: 22),
-
-          Container(
-            height: 330,
-            decoration: BoxDecoration(
-              gradient:
-                  const LinearGradient(
-                begin: Alignment.topLeft,
-                end:
-                    Alignment.bottomRight,
-                colors: [
-                  Color(0xFF10243E),
-                  Color(0xFF081624),
-                ],
-              ),
-              borderRadius:
-                  BorderRadius.circular(24),
-              border: Border.all(
-                color:
-                    const Color(0xFF1D3A5C),
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment:
-                    MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.all(
-                      18,
-                    ),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: TaggyColors.blue
-                          .withOpacity(0.15),
-                    ),
-                    child: const Icon(
-                      Icons.location_on,
-                      size: 65,
-                      color:
-                          TaggyColors.lightBlue,
-                    ),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'UbicaciÃ³n',
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Actualizar ubicaciÃ³n',
+                  onPressed: cargando ? null : cargarUbicacion,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ],
+            ),
 
-                  const SizedBox(height: 18),
+            const SizedBox(height: 5),
 
+            const Text(
+              'Seguimiento GPS real del collar',
+              style: TextStyle(color: TaggyColors.textSecondary),
+            ),
+
+            const SizedBox(height: 18),
+
+            if (widget.mascotas.length > 1)
+              DropdownButtonFormField<Mascota>(
+                value: mascotaSeleccionada,
+                decoration: const InputDecoration(
+                  labelText: 'Mascota',
+                  prefixIcon: Icon(Icons.pets),
+                ),
+                items: widget.mascotas
+                    .map(
+                      (mascota) => DropdownMenuItem<Mascota>(
+                        value: mascota,
+                        child: Text(mascota.nombre),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (mascota) {
+                  if (mascota == null) return;
+
+                  setState(() {
+                    mascotaSeleccionada = mascota;
+                  });
+
+                  cargarUbicacion();
+                },
+              ),
+
+            if (widget.mascotas.length > 1) const SizedBox(height: 18),
+
+            if (widget.mascotas.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: TaggyColors.surface,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(
+                      Icons.pets_outlined,
+                      size: 45,
+                      color: TaggyColors.textSecondary,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Agrega una mascota para consultar su ubicaciÃ³n.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: TaggyColors.textSecondary),
+                    ),
+                  ],
+                ),
+              )
+            else if (cargando)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 80),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (error != null)
+              Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: TaggyColors.surface,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.location_off_outlined,
+                      size: 48,
+                      color: TaggyColors.orange,
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: TaggyColors.textSecondary),
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: cargarUbicacion,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              if (tieneUbicacion) ...[
+                SegmentedButton<int>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment<int>(value: 0, label: Text('Ahora')),
+                    ButtonSegment<int>(value: 24, label: Text('24 h')),
+                    ButtonSegment<int>(value: 168, label: Text('7 dÃ­as')),
+                  ],
+                  selected: <int>{horasHistorial ?? 0},
+                  onSelectionChanged: (seleccion) {
+                    final valor = seleccion.first;
+
+                    seleccionarPeriodo(valor == 0 ? null : valor);
+                  },
+                ),
+
+                const SizedBox(height: 12),
+
+                if (horasHistorial != null)
                   Text(
-                    mascota == null
-                        ? 'Sin mascota'
-                        : mascota.nombre,
+                    cargandoHistorial
+                        ? 'Cargando historial...'
+                        : 'Historial del recorrido: ${puntosHistorial.length} puntos GPS',
                     style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight:
-                          FontWeight.bold,
+                      color: TaggyColors.textSecondary,
+                      fontSize: 12,
                     ),
                   ),
 
-                  const SizedBox(height: 5),
+                if (horasHistorial != null) const SizedBox(height: 10),
 
-                  const Text(
-                    'Guadalajara, Jalisco',
-                    style: TextStyle(
-                      color: TaggyColors
-                          .textSecondary,
+                if (cargandoHistorial) const LinearProgressIndicator(),
+
+                if (cargandoHistorial) const SizedBox(height: 10),
+
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Container(
+                    height: 350,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: TaggyColors.blue.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: FlutterMap(
+                      key: ValueKey('map-$latitud-$longitud'),
+                      options: MapOptions(
+                        initialCenter: LatLng(
+                          double.parse(latitud!),
+                          double.parse(longitud!),
+                        ),
+                        initialZoom: 17,
+                        minZoom: 3,
+                        maxZoom: 19,
+                        onTap: (tapPosition, point) {
+                          if (!seleccionandoCentroZona) {
+                            return;
+                          }
+
+                          setState(() {
+                            seleccionandoCentroZona = false;
+                          });
+
+                          _abrirConfigZonaSegura(point);
+                        },
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.taggy.app',
+                          maxNativeZoom: 19,
+                        ),
+                        // RECORRIDO HISTORICO TAGGY
+                        if (puntosHistorial.length >= 2)
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: puntosHistorial,
+                                strokeWidth: 5,
+                                color: TaggyColors.cyan,
+                              ),
+                            ],
+                          ),
+
+                        if (puntosHistorial.isNotEmpty)
+                          MarkerLayer(
+                            markers: [
+                              if (_centroZonaSegura() != null)
+                                Marker(
+                                  key: const ValueKey('taggy-marcador-casa'),
+                                  point: _centroZonaSegura()!,
+                                  width: 52,
+                                  height: 52,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: TaggyColors.green,
+                                        width: 3,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.20,
+                                          ),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.home_rounded,
+                                      color: TaggyColors.green,
+                                      size: 28,
+                                    ),
+                                  ),
+                                ),
+
+                              Marker(
+                                point: puntosHistorial.first,
+                                width: 42,
+                                height: 42,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: TaggyColors.green,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 3,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.flag_rounded,
+                                    color: Colors.white,
+                                    size: 21,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: LatLng(
+                                double.parse(latitud!),
+                                double.parse(longitud!),
+                              ),
+                              width: 76,
+                              height: 76,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: mascotaSeleccionada?.extraviada == true
+                                      ? TaggyColors.red
+                                      : TaggyColors.blue,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 4,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black45,
+                                      blurRadius: 12,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.pets,
+                                  color: Colors.white,
+                                  size: 34,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
+                ),
 
-                  const SizedBox(height: 8),
+                const SizedBox(height: 7),
 
-                  const Text(
-                    '20.6736, -103.3440',
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Â© OpenStreetMap contributors',
                     style: TextStyle(
-                      color:
-                          TaggyColors.cyan,
+                      color: TaggyColors.textSecondary,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+              ],
+
+              Row(
+                children: [
+                  Expanded(
+                    child: MiniStatusCard(
+                      icono: Icons.gps_fixed,
+                      titulo: 'GPS',
+                      valor: tieneUbicacion ? 'Activo' : 'Sin seÃ±al',
+                      color: tieneUbicacion
+                          ? TaggyColors.green
+                          : TaggyColors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: MiniStatusCard(
+                      icono: Icons.signal_cellular_alt,
+                      titulo: '4G',
+                      valor: cuatroGConectado ? 'Conectado' : 'Sin reporte',
+                      color: cuatroGConectado
+                          ? TaggyColors.blue
+                          : TaggyColors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: MiniStatusCard(
+                      icono: Icons.battery_5_bar,
+                      titulo: 'BaterÃ­a',
+                      valor: bateria,
+                      color: TaggyColors.cyan,
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
 
-          const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-          const Row(
-            children: [
-              Expanded(
-                child: MiniStatusCard(
-                  icono:
-                      Icons.gps_fixed,
-                  titulo: 'GPS',
-                  valor: 'Activo',
-                  color:
-                      TaggyColors.green,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: TaggyColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: TaggyColors.blue.withValues(alpha: 0.16),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: TaggyColors.blue.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.shield_outlined,
+                            color: TaggyColors.blue,
+                          ),
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Zona segura',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                geocerca == null
+                                    ? 'Sin configurar'
+                                    : '${geocerca?['nombre'] ?? 'Casa'} Â· ${geocerca?['radio_metros'] ?? 100} m',
+                                style: TextStyle(
+                                  color: TaggyColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: guardandoZona
+                            ? null
+                            : _activarSeleccionCentroZona,
+                        icon: const Icon(Icons.edit_location_alt_outlined),
+                        label: Text(
+                          guardandoZona
+                              ? 'Guardando...'
+                              : geocerca == null
+                              ? 'Configurar zona segura'
+                              : 'Editar zona segura',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(width: 10),
-              Expanded(
-                child: MiniStatusCard(
-                  icono: Icons
-                      .signal_cellular_alt,
-                  titulo: '4G',
-                  valor: 'Conectado',
-                  color:
-                      TaggyColors.blue,
-                ),
+
+              const SizedBox(height: 18),
+
+              InfoCard(
+                icono: Icons.access_time,
+                titulo: 'Ãšltima ubicaciÃ³n',
+                valor: _tiempoRelativo(fechaRecepcion),
               ),
-              SizedBox(width: 10),
-              Expanded(
-                child: MiniStatusCard(
-                  icono:
-                      Icons.battery_5_bar,
-                  titulo: 'Batería',
-                  valor: '78%',
-                  color:
-                      TaggyColors.cyan,
+
+              InfoCard(
+                icono: Icons.router_outlined,
+                titulo: 'Ãšltima conexiÃ³n del collar',
+                valor: _tiempoRelativo(ultimaConexion),
+              ),
+
+              InfoCard(
+                icono: Icons.settings_remote_outlined,
+                titulo: 'Modo del collar',
+                valor: modo.isEmpty ? 'Sin dato' : modo,
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'Desliza hacia abajo o usa el botÃ³n de actualizar para consultar la posiciÃ³n mÃ¡s reciente.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: TaggyColors.textSecondary,
+                  fontSize: 13,
                 ),
               ),
             ],
-          ),
 
-          const SizedBox(height: 20),
-
-          const InfoCard(
-            icono: Icons.access_time,
-            titulo:
-                'Última actualización',
-            valor: 'Hace 2 minutos',
-          ),
-        ],
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -2805,10 +3185,7 @@ class _TaggyAlerta {
 class AlertasPage extends StatefulWidget {
   final List<Mascota> mascotas;
 
-  const AlertasPage({
-    super.key,
-    required this.mascotas,
-  });
+  const AlertasPage({super.key, required this.mascotas});
 
   @override
   State<AlertasPage> createState() => _AlertasPageState();
@@ -2856,27 +3233,130 @@ class _AlertasPageState extends State<AlertasPage> {
       final nuevasAlertas = <_TaggyAlerta>[];
 
       for (final mascota in widget.mascotas) {
-        if (mascota.id == null) continue;
+        if (mascota.id == null) {
+          continue;
+        }
 
-        final eventos = await ApiService.obtenerEventosMascota(
-          mascota.id!,
-        );
+        // ==================================================
+        // EVENTOS REALES GUARDADOS EN POSTGRESQL
+        // ==================================================
 
-        for (final evento in eventos) {
-          nuevasAlertas.add(
-            _crearAlerta(
-              evento: evento,
-              mascota: mascota,
-            ),
+        try {
+          final eventos = await ApiService.obtenerEventosMascota(mascota.id!);
+
+          for (final evento in eventos) {
+            nuevasAlertas.add(_crearAlerta(evento: evento, mascota: mascota));
+          }
+        } catch (e) {
+          debugPrint(
+            'No se pudieron cargar eventos de '
+            '${mascota.nombre}: $e',
+          );
+        }
+
+        // ==================================================
+        // ESTADO ACTUAL REAL DEL COLLAR
+        // ==================================================
+
+        try {
+          final estado = await ApiService.obtenerEstadoActualCollar(
+            mascota.id!,
+          );
+
+          final dispositivoRaw = estado['dispositivo'];
+
+          if (dispositivoRaw is Map) {
+            final dispositivo = Map<String, dynamic>.from(dispositivoRaw);
+
+            // ==============================================
+            // BATERIA BAJA
+            // ==============================================
+
+            final bateria = int.tryParse(
+              dispositivo['bateria']?.toString() ?? '',
+            );
+
+            final ultimaConexionTexto = dispositivo['ultima_conexion']
+                ?.toString();
+
+            DateTime? ultimaConexion;
+
+            if (ultimaConexionTexto != null && ultimaConexionTexto.isNotEmpty) {
+              ultimaConexion = DateTime.tryParse(ultimaConexionTexto)
+                  ?.toLocal();
+            }
+
+            if (bateria != null && bateria <= 20) {
+              nuevasAlertas.add(
+                _TaggyAlerta(
+                  tipo: 'BATERIA_BAJA_ACTUAL',
+                  titulo: bateria <= 10 ? 'BaterÃ­a crÃ­tica' : 'BaterÃ­a baja',
+                  descripcion:
+                      'El collar de ${mascota.nombre} '
+                      'tiene $bateria% de baterÃ­a.',
+                  fecha: ultimaConexion ?? DateTime.now(),
+                  icono: Icons.battery_alert_rounded,
+                  color: bateria <= 10 ? TaggyColors.red : TaggyColors.orange,
+                ),
+              );
+            }
+
+            // ==============================================
+            // COLLAR OFFLINE
+            // ==============================================
+
+            final modo =
+                dispositivo['modo']?.toString().toLowerCase() ?? 'normal';
+
+            Duration limiteOffline;
+
+            switch (modo) {
+              case 'extravio':
+                limiteOffline = const Duration(minutes: 2);
+                break;
+
+              case 'mantenimiento':
+                limiteOffline = const Duration(minutes: 30);
+                break;
+
+              default:
+                limiteOffline = const Duration(minutes: 7);
+            }
+
+            if (ultimaConexion != null) {
+              final diferencia = DateTime.now().difference(ultimaConexion);
+
+              if (diferencia > limiteOffline) {
+                nuevasAlertas.add(
+                  _TaggyAlerta(
+                    tipo: 'COLLAR_OFFLINE',
+                    titulo: 'Collar sin conexiÃ³n',
+                    descripcion:
+                        'TAGGY no ha recibido datos '
+                        'del collar de '
+                        '${mascota.nombre} durante '
+                        '${_duracionOffline(diferencia)}.',
+                    fecha: ultimaConexion,
+                    icono: Icons.signal_wifi_connected_no_internet_4_rounded,
+                    color: TaggyColors.red,
+                  ),
+                );
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint(
+            'No se pudo comprobar el estado de '
+            '${mascota.nombre}: $e',
           );
         }
       }
 
-      nuevasAlertas.sort(
-        (a, b) => b.fecha.compareTo(a.fecha),
-      );
+      nuevasAlertas.sort((a, b) => b.fecha.compareTo(a.fecha));
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         alertas = nuevasAlertas;
@@ -2884,26 +3364,36 @@ class _AlertasPageState extends State<AlertasPage> {
         error = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         cargando = false;
-        error = e
-            .toString()
-            .replaceFirst('Exception: ', '');
+        error = e.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  String _duracionOffline(Duration diferencia) {
+    if (diferencia.inMinutes < 60) {
+      return '${diferencia.inMinutes} minutos';
+    }
+
+    if (diferencia.inHours < 24) {
+      return '${diferencia.inHours} horas';
+    }
+
+    return '${diferencia.inDays} dÃ­as';
   }
 
   _TaggyAlerta _crearAlerta({
     required Map<String, dynamic> evento,
     required Mascota mascota,
   }) {
-    final tipo =
-        evento['tipo']?.toString().toUpperCase() ?? 'EVENTO';
+    final tipo = evento['tipo']?.toString().toUpperCase() ?? 'EVENTO';
 
-    final descripcionServidor =
-        evento['descripcion']?.toString().trim() ?? '';
+    final descripcionServidor = evento['descripcion']?.toString().trim() ?? '';
 
     final datosRaw = evento['datos'];
     final datos = datosRaw is Map
@@ -2911,31 +3401,27 @@ class _AlertasPageState extends State<AlertasPage> {
         : <String, dynamic>{};
 
     final fecha = _parsearFecha(
-      evento['fecha_evento'] ??
-          evento['fecha_recepcion'],
+      evento['fecha_evento'] ?? evento['fecha_recepcion'],
     );
 
     switch (tipo) {
       case 'QR_SCAN':
         return _TaggyAlerta(
           tipo: tipo,
-          titulo: 'Código QR escaneado',
+          titulo: 'CÃ³digo QR escaneado',
           descripcion:
-              'Se consultó el perfil público de ${mascota.nombre} mediante su código QR.',
+              'Se consultÃ³ el perfil pÃºblico de ${mascota.nombre} mediante su cÃ³digo QR.',
           fecha: fecha,
           icono: Icons.qr_code_2_rounded,
           color: TaggyColors.cyan,
         );
 
       case 'AVISTAMIENTO':
-        final nombre =
-            datos['nombre_reportante']?.toString().trim() ?? '';
+        final nombre = datos['nombre_reportante']?.toString().trim() ?? '';
 
-        final telefono =
-            datos['telefono_reportante']?.toString().trim() ?? '';
+        final telefono = datos['telefono_reportante']?.toString().trim() ?? '';
 
-        final mensaje =
-            datos['mensaje']?.toString().trim() ?? '';
+        final mensaje = datos['mensaje']?.toString().trim() ?? '';
 
         final latitud = evento['latitud'];
         final longitud = evento['longitud'];
@@ -2943,11 +3429,11 @@ class _AlertasPageState extends State<AlertasPage> {
         final partes = <String>[];
 
         partes.add(
-          '${nombre.isEmpty ? 'Alguien' : nombre} reportó un avistamiento de ${mascota.nombre}.',
+          '${nombre.isEmpty ? 'Alguien' : nombre} reportÃ³ un avistamiento de ${mascota.nombre}.',
         );
 
         if (telefono.isNotEmpty) {
-          partes.add('Teléfono: $telefono.');
+          partes.add('TelÃ©fono: $telefono.');
         }
 
         if (mensaje.isNotEmpty) {
@@ -2956,7 +3442,7 @@ class _AlertasPageState extends State<AlertasPage> {
 
         if (latitud != null && longitud != null) {
           partes.add(
-            'Ubicación: ${latitud.toString()}, ${longitud.toString()}.',
+            'UbicaciÃ³n: ${latitud.toString()}, ${longitud.toString()}.',
           );
         }
 
@@ -2969,13 +3455,32 @@ class _AlertasPageState extends State<AlertasPage> {
           color: TaggyColors.orange,
         );
 
+      case 'MODO_EXTRAVIO':
+        final activado = datos['extraviada'] == true;
+        final esHembra = mascota.sexo.trim().toLowerCase() == 'hembra';
+
+        return _TaggyAlerta(
+          tipo: tipo,
+          titulo: activado
+              ? 'Modo extravÃ­o activado'
+              : 'Modo extravÃ­o desactivado',
+          descripcion: activado
+              ? '${mascota.nombre} fue marcada como ${esHembra ? 'extraviada' : 'extraviado'}.'
+              : '${mascota.nombre} fue marcada como ${esHembra ? 'encontrada' : 'encontrado'}.',
+          fecha: fecha,
+          icono: activado
+              ? Icons.warning_amber_rounded
+              : Icons.check_circle_outline_rounded,
+          color: activado ? TaggyColors.red : TaggyColors.green,
+        );
+
       case 'MANIPULACION':
         return _TaggyAlerta(
           tipo: tipo,
-          titulo: 'Posible manipulación',
+          titulo: 'Posible manipulaciÃ³n',
           descripcion: descripcionServidor.isNotEmpty
               ? descripcionServidor
-              : 'El collar de ${mascota.nombre} detectó una posible manipulación.',
+              : 'El collar de ${mascota.nombre} detectÃ³ una posible manipulaciÃ³n.',
           fecha: fecha,
           icono: Icons.shield_outlined,
           color: TaggyColors.red,
@@ -2985,10 +3490,10 @@ class _AlertasPageState extends State<AlertasPage> {
       case 'LOW_BATTERY':
         return _TaggyAlerta(
           tipo: tipo,
-          titulo: 'Batería baja',
+          titulo: 'BaterÃ­a baja',
           descripcion: descripcionServidor.isNotEmpty
               ? descripcionServidor
-              : 'El collar de ${mascota.nombre} reportó batería baja.',
+              : 'El collar de ${mascota.nombre} reportÃ³ baterÃ­a baja.',
           fecha: fecha,
           icono: Icons.battery_alert_rounded,
           color: TaggyColors.orange,
@@ -2998,10 +3503,10 @@ class _AlertasPageState extends State<AlertasPage> {
       case 'LOCATION':
         return _TaggyAlerta(
           tipo: tipo,
-          titulo: 'Nueva ubicación',
+          titulo: 'Nueva ubicaciÃ³n',
           descripcion: descripcionServidor.isNotEmpty
               ? descripcionServidor
-              : 'Se recibió una nueva ubicación de ${mascota.nombre}.',
+              : 'Se recibiÃ³ una nueva ubicaciÃ³n de ${mascota.nombre}.',
           fecha: fecha,
           icono: Icons.location_on_outlined,
           color: TaggyColors.blue,
@@ -3015,14 +3520,11 @@ class _AlertasPageState extends State<AlertasPage> {
               .toLowerCase()
               .split(' ')
               .where((parte) => parte.isNotEmpty)
-              .map(
-                (parte) =>
-                    '${parte[0].toUpperCase()}${parte.substring(1)}',
-              )
+              .map((parte) => '${parte[0].toUpperCase()}${parte.substring(1)}')
               .join(' '),
           descripcion: descripcionServidor.isNotEmpty
               ? descripcionServidor
-              : 'Se registró actividad de ${mascota.nombre}.',
+              : 'Se registrÃ³ actividad de ${mascota.nombre}.',
           fecha: fecha,
           icono: Icons.notifications_outlined,
           color: TaggyColors.blue,
@@ -3036,9 +3538,7 @@ class _AlertasPageState extends State<AlertasPage> {
     }
 
     try {
-      return DateTime.parse(
-        valor.toString(),
-      ).toLocal();
+      return DateTime.parse(valor.toString()).toLocal();
     } catch (_) {
       return DateTime.now();
     }
@@ -3068,7 +3568,7 @@ class _AlertasPageState extends State<AlertasPage> {
     }
 
     if (diferencia.inDays < 7) {
-      return 'Hace ${diferencia.inDays} días';
+      return 'Hace ${diferencia.inDays} dÃ­as';
     }
 
     final dia = fecha.day.toString().padLeft(2, '0');
@@ -3099,18 +3599,13 @@ class _AlertasPageState extends State<AlertasPage> {
                 const Expanded(
                   child: Text(
                     'Alertas',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
                   tooltip: 'Actualizar alertas',
                   onPressed: cargarAlertas,
-                  icon: const Icon(
-                    Icons.refresh_rounded,
-                  ),
+                  icon: const Icon(Icons.refresh_rounded),
                 ),
               ],
             ),
@@ -3119,9 +3614,7 @@ class _AlertasPageState extends State<AlertasPage> {
 
             const Text(
               'Actividad real registrada por TAGGY',
-              style: TextStyle(
-                color: TaggyColors.textSecondary,
-              ),
+              style: TextStyle(color: TaggyColors.textSecondary),
             ),
 
             const SizedBox(height: 22),
@@ -3129,21 +3622,17 @@ class _AlertasPageState extends State<AlertasPage> {
             if (algunaExtraviada)
               const AlertaCard(
                 icono: Icons.warning_amber_rounded,
-                titulo: 'Modo extravío activo',
+                titulo: 'Modo extravÃ­o activo',
                 descripcion:
-                    'Una de tus mascotas está marcada como extraviada.',
+                    'Una de tus mascotas estÃ¡ marcada como extraviada.',
                 color: TaggyColors.red,
                 tiempo: 'Ahora',
               ),
 
             if (cargando)
               const Padding(
-                padding: EdgeInsets.symmetric(
-                  vertical: 35,
-                ),
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
+                padding: EdgeInsets.symmetric(vertical: 35),
+                child: Center(child: CircularProgressIndicator()),
               )
             else if (error != null)
               Container(
@@ -3163,9 +3652,7 @@ class _AlertasPageState extends State<AlertasPage> {
                     Text(
                       error!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: TaggyColors.textSecondary,
-                      ),
+                      style: const TextStyle(color: TaggyColors.textSecondary),
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
@@ -3192,11 +3679,9 @@ class _AlertasPageState extends State<AlertasPage> {
                     ),
                     SizedBox(height: 12),
                     Text(
-                      'Todavía no hay actividad registrada.',
+                      'TodavÃ­a no hay actividad registrada.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: TaggyColors.textSecondary,
-                      ),
+                      style: TextStyle(color: TaggyColors.textSecondary),
                     ),
                   ],
                 ),
@@ -3275,6 +3760,52 @@ class _PerfilPageState extends State<PerfilPage> {
     }
   }
 
+  bool activandoNotificaciones = false;
+  String estadoNotificaciones = 'Toca para activar';
+
+  Future<void> activarNotificacionesPush() async {
+    if (activandoNotificaciones) return;
+
+    setState(() {
+      activandoNotificaciones = true;
+    });
+
+    try {
+      final suscripcion = await PushService.crearSuscripcion();
+
+      await ApiService.registrarSuscripcionPush(suscripcion);
+
+      if (!mounted) return;
+
+      setState(() {
+        estadoNotificaciones = 'Activadas';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Notificaciones activadas correctamente.'),
+        ),
+      );
+
+      await ApiService.enviarPushPrueba();
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        estadoNotificaciones = 'No activadas';
+      });
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('No se pudieron activar: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          activandoNotificaciones = false;
+        });
+      }
+    }
+  }
+
   Future<void> cerrarSesion() async {
     await ApiService.logout();
 
@@ -3282,9 +3813,7 @@ class _PerfilPageState extends State<PerfilPage> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(
-        builder: (_) => const LoginPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const LoginPage()),
       (route) => false,
     );
   }
@@ -3292,11 +3821,7 @@ class _PerfilPageState extends State<PerfilPage> {
   @override
   Widget build(BuildContext context) {
     if (cargando) {
-      return const SafeArea(
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const SafeArea(child: Center(child: CircularProgressIndicator()));
     }
 
     final nombreCompleto = '$nombre $apellido'.trim();
@@ -3312,10 +3837,7 @@ class _PerfilPageState extends State<PerfilPage> {
             const SizedBox(height: 25),
             const Text(
               'Mi perfil',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 25),
             Center(
@@ -3325,10 +3847,7 @@ class _PerfilPageState extends State<PerfilPage> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [
-                      TaggyColors.blue,
-                      TaggyColors.cyan,
-                    ],
+                    colors: [TaggyColors.blue, TaggyColors.cyan],
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -3337,19 +3856,13 @@ class _PerfilPageState extends State<PerfilPage> {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.person,
-                  size: 60,
-                  color: Colors.white,
-                ),
+                child: const Icon(Icons.person, size: 60, color: Colors.white),
               ),
             ),
             const SizedBox(height: 18),
             Center(
               child: Text(
-                nombreCompleto.isEmpty
-                    ? 'Usuario TAGGY'
-                    : nombreCompleto,
+                nombreCompleto.isEmpty ? 'Usuario TAGGY' : nombreCompleto,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 23,
@@ -3365,18 +3878,40 @@ class _PerfilPageState extends State<PerfilPage> {
             ),
             InfoCard(
               icono: Icons.phone_outlined,
-              titulo: 'Teléfono',
-              valor: telefono.isEmpty ? 'Sin teléfono' : telefono,
+              titulo: 'TelÃ©fono',
+              valor: telefono.isEmpty ? 'Sin telÃ©fono' : telefono,
             ),
-            const InfoCard(
+            InfoCard(
               icono: Icons.notifications_outlined,
               titulo: 'Notificaciones',
-              valor: 'Activadas',
+              valor: estadoNotificaciones,
             ),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: activandoNotificaciones
+                    ? null
+                    : activarNotificacionesPush,
+                icon: activandoNotificaciones
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.notifications_active_outlined),
+                label: Text(
+                  activandoNotificaciones
+                      ? 'Activando...'
+                      : 'Activar notificaciones',
+                ),
+              ),
+            ),
+            const SizedBox(height: 11),
             const InfoCard(
               icono: Icons.security_outlined,
               titulo: 'Seguridad',
-              valor: 'Protección activa',
+              valor: 'ProtecciÃ³n activa',
             ),
             const SizedBox(height: 25),
             SizedBox(
@@ -3384,17 +3919,13 @@ class _PerfilPageState extends State<PerfilPage> {
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: TaggyColors.red,
-                  side: const BorderSide(
-                    color: TaggyColors.red,
-                  ),
+                  side: const BorderSide(color: TaggyColors.red),
                 ),
                 onPressed: cerrarSesion,
                 icon: const Icon(Icons.logout),
                 label: const Text(
-                  'Cerrar sesión',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  'Cerrar sesiÃ³n',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -3407,17 +3938,14 @@ class _PerfilPageState extends State<PerfilPage> {
 }
 
 // ======================================================
-// EXTRAVÍO// ======================================================
-// EXTRAVÍO
+// EXTRAVÃO// ======================================================
+// EXTRAVÃO
 // ======================================================
 
-class ExtravioPage
-    extends StatefulWidget {
+class ExtravioPage extends StatefulWidget {
   final Mascota mascota;
 
-  final Future<void> Function(
-    bool estado,
-  ) onEstadoChanged;
+  final Future<void> Function(bool estado) onEstadoChanged;
 
   const ExtravioPage({
     super.key,
@@ -3426,28 +3954,23 @@ class ExtravioPage
   });
 
   @override
-  State<ExtravioPage> createState() =>
-      _ExtravioPageState();
+  State<ExtravioPage> createState() => _ExtravioPageState();
 }
 
-class _ExtravioPageState
-    extends State<ExtravioPage> {
+class _ExtravioPageState extends State<ExtravioPage> {
   late bool extraviada;
 
   @override
   void initState() {
     super.initState();
-    extraviada =
-        widget.mascota.extraviada;
+    extraviada = widget.mascota.extraviada;
   }
 
   Future<void> cambiarEstado() async {
     final nuevoEstado = !extraviada;
 
     try {
-      await widget.onEstadoChanged(
-        nuevoEstado,
-      );
+      await widget.onEstadoChanged(nuevoEstado);
 
       if (mounted) {
         setState(() {
@@ -3462,33 +3985,24 @@ class _ExtravioPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:
-          AppBar(title: const Text('Modo extravío')),
+      appBar: AppBar(title: const Text('Modo extravÃ­o')),
       body: Padding(
         padding: const EdgeInsets.all(25),
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding:
-                  const EdgeInsets.all(30),
+              padding: const EdgeInsets.all(30),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: extraviada
-                    ? TaggyColors.red
-                        .withOpacity(0.15)
-                    : TaggyColors.green
-                        .withOpacity(0.15),
+                    ? TaggyColors.red.withOpacity(0.15)
+                    : TaggyColors.green.withOpacity(0.15),
               ),
               child: Icon(
-                extraviada
-                    ? Icons.warning_rounded
-                    : Icons.check_circle,
+                extraviada ? Icons.warning_rounded : Icons.check_circle,
                 size: 100,
-                color: extraviada
-                    ? TaggyColors.red
-                    : TaggyColors.green,
+                color: extraviada ? TaggyColors.red : TaggyColors.green,
               ),
             ),
 
@@ -3496,26 +4010,20 @@ class _ExtravioPageState
 
             Text(
               extraviada
-                  ? '${widget.mascota.nombre} está extraviado'
-                  : '${widget.mascota.nombre} está seguro',
+                  ? '${widget.mascota.nombre} estÃ¡ ${widget.mascota.sexo.trim().toLowerCase() == 'hembra' ? 'extraviada' : 'extraviado'}'
+                  : '${widget.mascota.nombre} estÃ¡ ${widget.mascota.sexo.trim().toLowerCase() == 'hembra' ? 'segura' : 'seguro'}',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 27,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
             ),
 
             const SizedBox(height: 12),
 
             Text(
               extraviada
-                  ? 'El perfil público mostrará que la mascota está perdida.'
-                  : 'No hay ningún reporte de extravío activo.',
+                  ? 'El perfil pÃºblico mostrarÃ¡ que la mascota estÃ¡ perdida.'
+                  : 'No hay ningÃºn reporte de extravÃ­o activo.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color:
-                    TaggyColors.textSecondary,
-              ),
+              style: const TextStyle(color: TaggyColors.textSecondary),
             ),
 
             const SizedBox(height: 35),
@@ -3524,19 +4032,13 @@ class _ExtravioPageState
               width: double.infinity,
               height: 55,
               child: FilledButton.icon(
-                style:
-                    FilledButton.styleFrom(
-                  backgroundColor:
-                      extraviada
-                          ? TaggyColors.green
-                          : TaggyColors.red,
+                style: FilledButton.styleFrom(
+                  backgroundColor: extraviada
+                      ? TaggyColors.green
+                      : TaggyColors.red,
                 ),
                 onPressed: cambiarEstado,
-                icon: Icon(
-                  extraviada
-                      ? Icons.check
-                      : Icons.warning,
-                ),
+                icon: Icon(extraviada ? Icons.check : Icons.warning),
                 label: Text(
                   extraviada
                       ? 'Marcar como encontrada'
@@ -3558,10 +4060,7 @@ class _ExtravioPageState
 class QrPage extends StatefulWidget {
   final Mascota mascota;
 
-  const QrPage({
-    super.key,
-    required this.mascota,
-  });
+  const QrPage({super.key, required this.mascota});
 
   @override
   State<QrPage> createState() => _QrPageState();
@@ -3582,15 +4081,13 @@ class _QrPageState extends State<QrPage> {
     if (widget.mascota.id == null) {
       setState(() {
         cargando = false;
-        error = 'La mascota todavía no tiene un ID válido.';
+        error = 'La mascota todavÃ­a no tiene un ID vÃ¡lido.';
       });
       return;
     }
 
     try {
-      final valor = await ApiService.generarQr(
-        widget.mascota.id!,
-      );
+      final valor = await ApiService.generarQr(widget.mascota.id!);
 
       if (!mounted) return;
 
@@ -3610,18 +4107,14 @@ class _QrPageState extends State<QrPage> {
 
   @override
   Widget build(BuildContext context) {
-    final urlPublica = token == null
-        ? null
-        : '${ApiService.baseUrl}/p/$token';
+    final urlPublica = token == null ? null : '${ApiService.baseUrl}/p/$token';
 
     final urlQr = token == null
         ? null
         : '${ApiService.baseUrl}/api/public/qr/$token.png';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Código QR'),
-      ),
+      appBar: AppBar(title: const Text('CÃ³digo QR')),
       body: ListView(
         padding: const EdgeInsets.all(25),
         children: [
@@ -3648,10 +4141,7 @@ class _QrPageState extends State<QrPage> {
                     size: 50,
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    error!,
-                    textAlign: TextAlign.center,
-                  ),
+                  Text(error!, textAlign: TextAlign.center),
                   const SizedBox(height: 15),
                   FilledButton(
                     onPressed: () {
@@ -3707,31 +4197,23 @@ class _QrPageState extends State<QrPage> {
             SelectableText(
               urlPublica!,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: TaggyColors.cyan,
-              ),
+              style: const TextStyle(color: TaggyColors.cyan),
             ),
             const SizedBox(height: 20),
             SizedBox(
               height: 53,
               child: FilledButton.icon(
                 onPressed: () async {
-                  await Clipboard.setData(
-                    ClipboardData(text: urlPublica!),
-                  );
+                  await Clipboard.setData(ClipboardData(text: urlPublica!));
 
                   if (!context.mounted) return;
 
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Enlace público copiado',
-                      ),
-                    ),
+                    const SnackBar(content: Text('Enlace pÃºblico copiado')),
                   );
                 },
                 icon: const Icon(Icons.copy),
-                label: const Text('Copiar enlace público'),
+                label: const Text('Copiar enlace pÃºblico'),
               ),
             ),
             const SizedBox(height: 12),
@@ -3742,9 +4224,8 @@ class _QrPageState extends State<QrPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => PerfilPublicoPage(
-                        mascota: widget.mascota,
-                      ),
+                      builder: (_) =>
+                          PerfilPublicoPage(mascota: widget.mascota),
                     ),
                   );
                 },
@@ -3760,77 +4241,55 @@ class _QrPageState extends State<QrPage> {
 }
 
 // ======================================================
-// PERFIL PÚBLICO// ======================================================
-// PERFIL PÚBLICO
+// PERFIL PÃšBLICO// ======================================================
+// PERFIL PÃšBLICO
 // ======================================================
 
-class PerfilPublicoPage
-    extends StatelessWidget {
+class PerfilPublicoPage extends StatelessWidget {
   final Mascota mascota;
 
-  const PerfilPublicoPage({
-    super.key,
-    required this.mascota,
-  });
+  const PerfilPublicoPage({super.key, required this.mascota});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:
-          AppBar(title: const Text('TAGGY')),
+      appBar: AppBar(title: const Text('TAGGY')),
       body: ListView(
         padding: const EdgeInsets.all(25),
         children: [
-          Center(
-            child: PetAvatar(
-              size: 125,
-              imagenPath: mascota.imagenPath,
-            ),
-          ),
+          Center(child: PetAvatar(size: 125, imagenPath: mascota.imagenPath)),
 
           const SizedBox(height: 20),
 
           Center(
             child: Text(
               mascota.nombre,
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight:
-                    FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
             ),
           ),
 
           const SizedBox(height: 8),
 
-          Center(
-            child: StatusBadge(
-              extraviada:
-                  mascota.extraviada,
-            ),
-          ),
+          Center(child: StatusBadge(extraviada: mascota.extraviada)),
 
           const SizedBox(height: 25),
 
           InfoCard(
             icono: Icons.pets,
             titulo: 'Raza',
-            valor:
-                valorSeguro(mascota.raza),
+            valor: valorSeguro(mascota.raza),
           ),
 
           InfoCard(
             icono: Icons.cake,
             titulo: 'Edad',
-            valor:
-                valorSeguro(mascota.edad),
+            valor: valorSeguro(mascota.edad),
           ),
 
           InfoCard(
             icono: Icons.palette,
             titulo: 'Color',
-            valor:
-                valorSeguro(mascota.color),
+            valor: valorSeguro(mascota.color),
           ),
 
           const SizedBox(height: 18),
@@ -3839,20 +4298,14 @@ class PerfilPublicoPage
             height: 53,
             child: FilledButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Contactando al propietario...',
-                    ),
+                    content: Text('Contactando al propietario...'),
                   ),
                 );
               },
-              icon:
-                  const Icon(Icons.phone),
-              label: const Text(
-                'Contactar propietario',
-              ),
+              icon: const Icon(Icons.phone),
+              label: const Text('Contactar propietario'),
             ),
           ),
 
@@ -3860,24 +4313,16 @@ class PerfilPublicoPage
 
           SizedBox(
             height: 53,
-            child:
-                FilledButton.tonalIcon(
+            child: FilledButton.tonalIcon(
               onPressed: () {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Avistamiento enviado (simulación).',
-                    ),
+                    content: Text('Avistamiento enviado (simulaciÃ³n).'),
                   ),
                 );
               },
-              icon: const Icon(
-                Icons.location_on,
-              ),
-              label: const Text(
-                'Reportar avistamiento',
-              ),
+              icon: const Icon(Icons.location_on),
+              label: const Text('Reportar avistamiento'),
             ),
           ),
         ],
@@ -3890,64 +4335,47 @@ class PerfilPublicoPage
 // SEGURIDAD
 // ======================================================
 
-class SeguridadPage
-    extends StatefulWidget {
+class SeguridadPage extends StatefulWidget {
   const SeguridadPage({super.key});
 
   @override
-  State<SeguridadPage> createState() =>
-      _SeguridadPageState();
+  State<SeguridadPage> createState() => _SeguridadPageState();
 }
 
-class _SeguridadPageState
-    extends State<SeguridadPage> {
+class _SeguridadPageState extends State<SeguridadPage> {
   bool proteccion = true;
   bool mantenimiento = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:
-          AppBar(title: const Text('Seguridad')),
+      appBar: AppBar(title: const Text('Seguridad')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           Container(
-            padding:
-                const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              gradient:
-                  const LinearGradient(
-                colors: [
-                  Color(0xFF102A46),
-                  Color(0xFF0C192A),
-                ],
+              gradient: const LinearGradient(
+                colors: [Color(0xFF102A46), Color(0xFF0C192A)],
               ),
-              borderRadius:
-                  BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
               children: [
                 Icon(
-                  proteccion
-                      ? Icons.shield
-                      : Icons.shield_outlined,
+                  proteccion ? Icons.shield : Icons.shield_outlined,
                   size: 75,
-                  color: proteccion
-                      ? TaggyColors.green
-                      : TaggyColors.red,
+                  color: proteccion ? TaggyColors.green : TaggyColors.red,
                 ),
 
                 const SizedBox(height: 12),
 
                 Text(
-                  proteccion
-                      ? 'Protección activa'
-                      : 'Protección desactivada',
+                  proteccion ? 'ProtecciÃ³n activa' : 'ProtecciÃ³n desactivada',
                   style: const TextStyle(
                     fontSize: 22,
-                    fontWeight:
-                        FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
@@ -3957,11 +4385,9 @@ class _SeguridadPageState
           const SizedBox(height: 22),
 
           SwitchListTile(
-            tileColor:
-                TaggyColors.surface,
+            tileColor: TaggyColors.surface,
             shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(18),
             ),
             value: proteccion,
             onChanged: (value) {
@@ -3969,47 +4395,36 @@ class _SeguridadPageState
                 proteccion = value;
               });
             },
-            title: const Text(
-              'Protección antirrobo',
-            ),
-            subtitle: const Text(
-              'Activa las alertas de manipulación',
-            ),
+            title: const Text('ProtecciÃ³n antirrobo'),
+            subtitle: const Text('Activa las alertas de manipulaciÃ³n'),
           ),
 
           const SizedBox(height: 12),
 
           const InfoCard(
-            icono:
-                Icons.lock_outline,
-            titulo:
-                'Sensor de carcasa',
+            icono: Icons.lock_outline,
+            titulo: 'Sensor de carcasa',
             valor: 'Normal',
           ),
 
           const InfoCard(
-            icono:
-                Icons.link_outlined,
+            icono: Icons.link_outlined,
             titulo: 'Sensor de broche',
             valor: 'Cerrado',
           ),
 
           const InfoCard(
-            icono:
-                Icons.cell_tower,
-            titulo:
-                'Última comunicación',
+            icono: Icons.cell_tower,
+            titulo: 'Ãšltima comunicaciÃ³n',
             valor: 'Hace 30 segundos',
           ),
 
           const SizedBox(height: 15),
 
           SwitchListTile(
-            tileColor:
-                TaggyColors.surface,
+            tileColor: TaggyColors.surface,
             shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(18),
             ),
             value: mantenimiento,
             onChanged: (value) {
@@ -4017,12 +4432,8 @@ class _SeguridadPageState
                 mantenimiento = value;
               });
             },
-            title: const Text(
-              'Modo mantenimiento',
-            ),
-            subtitle: const Text(
-              'Evita alertas mientras manipulas el collar',
-            ),
+            title: const Text('Modo mantenimiento'),
+            subtitle: const Text('Evita alertas mientras manipulas el collar'),
           ),
         ],
       ),
@@ -4031,7 +4442,7 @@ class _SeguridadPageState
 }
 
 // ======================================================
-// COMPONENTES DE DISEÑO
+// COMPONENTES DE DISEÃ‘O
 // ======================================================
 
 class TaggyLogo extends StatelessWidget {
@@ -4045,20 +4456,12 @@ class TaggyLogo extends StatelessWidget {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            gradient:
-                const LinearGradient(
-              colors: [
-                TaggyColors.blue,
-                TaggyColors.cyan,
-              ],
+            gradient: const LinearGradient(
+              colors: [TaggyColors.blue, TaggyColors.cyan],
             ),
-            borderRadius:
-                BorderRadius.circular(13),
+            borderRadius: BorderRadius.circular(13),
           ),
-          child: const Icon(
-            Icons.pets,
-            color: Colors.white,
-          ),
+          child: const Icon(Icons.pets, color: Colors.white),
         ),
 
         const SizedBox(width: 12),
@@ -4080,18 +4483,42 @@ class PetAvatar extends StatelessWidget {
   final double size;
   final String? imagenPath;
 
-  const PetAvatar({
-    super.key,
-    this.size = 90,
-    this.imagenPath,
-  });
+  const PetAvatar({super.key, this.size = 90, this.imagenPath});
+
+  ImageProvider<Object>? _obtenerImagen() {
+    final valor = imagenPath?.trim();
+
+    if (valor == null || valor.isEmpty) {
+      return null;
+    }
+
+    try {
+      if (valor.startsWith('data:image/')) {
+        final coma = valor.indexOf(',');
+
+        if (coma == -1) {
+          return null;
+        }
+
+        final base64Data = valor.substring(coma + 1);
+
+        return MemoryImage(base64Decode(base64Data));
+      }
+
+      if (valor.startsWith('http://') || valor.startsWith('https://')) {
+        return NetworkImage(valor);
+      }
+    } catch (e) {
+      debugPrint('ERROR MOSTRANDO FOTO TAGGY: $e');
+    }
+
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final existeImagen =
-        imagenPath != null &&
-        imagenPath!.isNotEmpty &&
-        File(imagenPath!).existsSync();
+    final imagen = _obtenerImagen();
+    final existeImagen = imagen != null;
 
     return Container(
       width: size,
@@ -4103,81 +4530,209 @@ class PetAvatar extends StatelessWidget {
             : const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  TaggyColors.blue,
-                  TaggyColors.cyan,
-                ],
+                colors: [TaggyColors.blue, TaggyColors.cyan],
               ),
         image: existeImagen
-            ? DecorationImage(
-                image: FileImage(
-                  File(imagenPath!),
-                ),
-                fit: BoxFit.cover,
-              )
+            ? DecorationImage(image: imagen, fit: BoxFit.cover)
             : null,
         border: Border.all(
-          color: TaggyColors.blue.withValues(
-            alpha: 0.28,
-          ),
+          color: TaggyColors.blue.withValues(alpha: 0.28),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: TaggyColors.blue.withValues(
-              alpha: 0.22,
-            ),
+            color: TaggyColors.blue.withValues(alpha: 0.22),
             blurRadius: 25,
           ),
         ],
       ),
       child: existeImagen
           ? null
-          : Icon(
-              Icons.pets,
-              size: size * 0.52,
-              color: Colors.white,
-            ),
+          : Icon(Icons.pets, size: size * 0.52, color: Colors.white),
     );
   }
 }
 
-class MascotaPrincipalCard
-    extends StatelessWidget {
+class MascotaPrincipalCard extends StatefulWidget {
   final Mascota mascota;
 
-  const MascotaPrincipalCard({
-    super.key,
-    required this.mascota,
-  });
+  const MascotaPrincipalCard({super.key, required this.mascota});
+
+  @override
+  State<MascotaPrincipalCard> createState() => _MascotaPrincipalCardState();
+}
+
+class _MascotaPrincipalCardState extends State<MascotaPrincipalCard> {
+  bool cargando = true;
+
+  bool gpsActivo = false;
+  bool cuatroGOnline = false;
+
+  String bateria = 'Sin dato';
+
+  @override
+  void initState() {
+    super.initState();
+    cargarEstadoReal();
+  }
+
+  @override
+  void didUpdateWidget(covariant MascotaPrincipalCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.mascota.id != widget.mascota.id) {
+      cargarEstadoReal();
+    }
+  }
+
+  DateTime? _parsearFecha(dynamic valor) {
+    if (valor == null) {
+      return null;
+    }
+
+    try {
+      return DateTime.parse(valor.toString()).toLocal();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _esReciente(DateTime? fecha, {int minutos = 10}) {
+    if (fecha == null) {
+      return false;
+    }
+
+    final diferencia = DateTime.now().difference(fecha);
+
+    if (diferencia.isNegative) {
+      return true;
+    }
+
+    return diferencia.inMinutes <= minutos;
+  }
+
+  String _formatearBateria(dynamic valor) {
+    if (valor == null) {
+      return 'Sin dato';
+    }
+
+    final numero = num.tryParse(valor.toString());
+
+    if (numero == null) {
+      return 'Sin dato';
+    }
+
+    return '${numero.round()}%';
+  }
+
+  Future<void> cargarEstadoReal() async {
+    final mascotaId = widget.mascota.id;
+
+    if (mascotaId == null) {
+      if (!mounted) return;
+
+      setState(() {
+        cargando = false;
+        gpsActivo = false;
+        cuatroGOnline = false;
+        bateria = 'Sin dato';
+      });
+
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        cargando = true;
+      });
+    }
+
+    try {
+      final datos = await ApiService.obtenerUltimaUbicacion(mascotaId);
+
+      final dispositivoRaw = datos['dispositivo'];
+
+      final ubicacionRaw = datos['ubicacion'];
+
+      final dispositivo = dispositivoRaw is Map
+          ? Map<String, dynamic>.from(dispositivoRaw)
+          : <String, dynamic>{};
+
+      final ubicacion = ubicacionRaw is Map
+          ? Map<String, dynamic>.from(ubicacionRaw)
+          : <String, dynamic>{};
+
+      final ultimaConexion = _parsearFecha(dispositivo['ultima_conexion']);
+
+      final ultimaUbicacion = _parsearFecha(ubicacion['fecha_recepcion']);
+
+      final latitud = ubicacion['latitud'];
+
+      final longitud = ubicacion['longitud'];
+
+      final tieneCoordenadas = latitud != null && longitud != null;
+
+      if (!mounted) return;
+
+      setState(() {
+        cuatroGOnline = _esReciente(ultimaConexion, minutos: 10);
+
+        gpsActivo =
+            tieneCoordenadas && _esReciente(ultimaUbicacion, minutos: 10);
+
+        bateria = _formatearBateria(dispositivo['bateria']);
+
+        cargando = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        cargando = false;
+        gpsActivo = false;
+        cuatroGOnline = false;
+        bateria = 'Sin dato';
+      });
+
+      debugPrint('ERROR ESTADO INICIO: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final mascota = widget.mascota;
+
+    final textoGps = cargando
+        ? '...'
+        : gpsActivo
+        ? 'Activo'
+        : 'Sin seÃ±al';
+
+    final texto4G = cargando
+        ? '...'
+        : cuatroGOnline
+        ? 'Online'
+        : 'Offline';
+
+    final textoBateria = cargando ? '...' : bateria;
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient:
-            const LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF132B49),
-            Color(0xFF0B1727),
-          ],
+          colors: [Color(0xFFFFFFFF), Color(0xFFF7F7F9)],
         ),
-        borderRadius:
-            BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(26),
         border: Border.all(
           color: mascota.extraviada
-              ? TaggyColors.red
-                  .withOpacity(0.5)
-              : TaggyColors.blue
-                  .withOpacity(0.35),
+              ? TaggyColors.red.withOpacity(0.5)
+              : TaggyColors.blue.withOpacity(0.35),
         ),
         boxShadow: [
           BoxShadow(
-            color: TaggyColors.blue
-                .withOpacity(0.08),
+            color: TaggyColors.blue.withOpacity(0.08),
             blurRadius: 25,
             offset: const Offset(0, 10),
           ),
@@ -4187,85 +4742,85 @@ class MascotaPrincipalCard
         children: [
           Row(
             children: [
-              PetAvatar(
-                size: 72,
-                imagenPath: mascota.imagenPath,
-              ),
+              PetAvatar(size: 72, imagenPath: mascota.imagenPath),
 
               const SizedBox(width: 16),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       mascota.nombre,
-                      style:
-                          const TextStyle(
+                      style: const TextStyle(
                         fontSize: 25,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
 
                     const SizedBox(height: 4),
 
                     Text(
-                      '${mascota.raza} • ${mascota.edad}',
-                      style:
-                          const TextStyle(
-                        color: TaggyColors
-                            .textSecondary,
-                      ),
+                      '${mascota.raza} â€¢ ${mascota.edad}',
+                      style: const TextStyle(color: TaggyColors.textSecondary),
                     ),
 
                     const SizedBox(height: 9),
 
-                    StatusBadge(
-                      extraviada:
-                          mascota.extraviada,
-                    ),
+                    StatusBadge(extraviada: mascota.extraviada),
                   ],
                 ),
+              ),
+
+              IconButton(
+                tooltip: 'Actualizar estado',
+                onPressed: cargando ? null : cargarEstadoReal,
+                icon: cargando
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(
+                        Icons.refresh_rounded,
+                        color: TaggyColors.textSecondary,
+                      ),
               ),
             ],
           ),
 
           const SizedBox(height: 23),
 
-          const Row(
+          Row(
             children: [
               Expanded(
                 child: MiniStatusCard(
-                  icono:
-                      Icons.gps_fixed,
+                  icono: Icons.gps_fixed,
                   titulo: 'GPS',
-                  valor: 'Activo',
-                  color:
-                      TaggyColors.green,
+                  valor: textoGps,
+                  color: gpsActivo ? TaggyColors.green : TaggyColors.orange,
                 ),
               ),
-              SizedBox(width: 10),
+
+              const SizedBox(width: 10),
+
               Expanded(
                 child: MiniStatusCard(
-                  icono: Icons
-                      .signal_cellular_alt,
+                  icono: Icons.signal_cellular_alt,
                   titulo: '4G',
-                  valor: 'Online',
-                  color:
-                      TaggyColors.blue,
+                  valor: texto4G,
+                  color: cuatroGOnline ? TaggyColors.blue : TaggyColors.orange,
                 ),
               ),
-              SizedBox(width: 10),
+
+              const SizedBox(width: 10),
+
               Expanded(
                 child: MiniStatusCard(
-                  icono:
-                      Icons.battery_5_bar,
-                  titulo: 'Batería',
-                  valor: '78%',
-                  color:
-                      TaggyColors.cyan,
+                  icono: Icons.battery_5_bar,
+                  titulo: 'BaterÃ­a',
+                  valor: textoBateria,
+                  color: TaggyColors.cyan,
                 ),
               ),
             ],
@@ -4276,8 +4831,7 @@ class MascotaPrincipalCard
   }
 }
 
-class MascotaListCard
-    extends StatelessWidget {
+class MascotaListCard extends StatelessWidget {
   final Mascota mascota;
   final VoidCallback onTap;
 
@@ -4291,77 +4845,54 @@ class MascotaListCard
   Widget build(BuildContext context) {
     return Material(
       color: TaggyColors.surface,
-      borderRadius:
-          BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding:
-              const EdgeInsets.all(15),
+          padding: const EdgeInsets.all(15),
           child: Row(
             children: [
-              PetAvatar(
-                size: 62,
-                imagenPath: mascota.imagenPath,
-              ),
+              PetAvatar(size: 62, imagenPath: mascota.imagenPath),
 
               const SizedBox(width: 15),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       mascota.nombre,
-                      style:
-                          const TextStyle(
+                      style: const TextStyle(
                         fontSize: 19,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
 
                     const SizedBox(height: 3),
 
                     Text(
-                      '${mascota.raza} • ${mascota.edad}',
-                      style:
-                          const TextStyle(
-                        color: TaggyColors
-                            .textSecondary,
-                      ),
+                      '${mascota.raza} â€¢ ${mascota.edad}',
+                      style: const TextStyle(color: TaggyColors.textSecondary),
                     ),
 
                     const SizedBox(height: 7),
 
                     Text(
-                      mascota.extraviada
-                          ? '● Extraviada'
-                          : '● Segura',
+                      mascota.extraviada ? 'â— Extraviada' : 'â— Segura',
                       style: TextStyle(
-                        color:
-                            mascota.extraviada
-                                ? TaggyColors
-                                    .red
-                                : TaggyColors
-                                    .green,
+                        color: mascota.extraviada
+                            ? TaggyColors.red
+                            : TaggyColors.green,
                         fontSize: 12,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              const Icon(
-                Icons.chevron_right,
-                color:
-                    TaggyColors.textSecondary,
-              ),
+              const Icon(Icons.chevron_right, color: TaggyColors.textSecondary),
             ],
           ),
         ),
@@ -4370,8 +4901,7 @@ class MascotaListCard
   }
 }
 
-class QuickActionCard
-    extends StatelessWidget {
+class QuickActionCard extends StatelessWidget {
   final String titulo;
   final String subtitulo;
   final IconData icono;
@@ -4391,40 +4921,23 @@ class QuickActionCard
   Widget build(BuildContext context) {
     return Material(
       color: TaggyColors.surface,
-      borderRadius:
-          BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding:
-              const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding:
-                    const EdgeInsets.all(
-                  9,
-                ),
+                padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color:
-                      color.withOpacity(
-                    0.14,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(
-                    12,
-                  ),
+                  color: color.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icono,
-                  color: color,
-                ),
+                child: Icon(icono, color: color),
               ),
 
               const Spacer(),
@@ -4432,8 +4945,7 @@ class QuickActionCard
               Text(
                 titulo,
                 style: const TextStyle(
-                  fontWeight:
-                      FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
               ),
@@ -4443,8 +4955,7 @@ class QuickActionCard
               Text(
                 subtitulo,
                 style: const TextStyle(
-                  color: TaggyColors
-                      .textSecondary,
+                  color: TaggyColors.textSecondary,
                   fontSize: 12,
                 ),
               ),
@@ -4456,8 +4967,7 @@ class QuickActionCard
   }
 }
 
-class MiniStatusCard
-    extends StatelessWidget {
+class MiniStatusCard extends StatelessWidget {
   final IconData icono;
   final String titulo;
   final String valor;
@@ -4474,45 +4984,32 @@ class MiniStatusCard
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: 14,
-        horizontal: 8,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
       decoration: BoxDecoration(
-        color:
-            TaggyColors.surfaceLight,
-        borderRadius:
-            BorderRadius.circular(16),
+        color: TaggyColors.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.10)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icono,
-            color: color,
-            size: 22,
-          ),
-
-          const SizedBox(height: 6),
-
+          Icon(icono, color: color, size: 20),
+          const SizedBox(height: 4),
           Text(
             titulo,
             style: const TextStyle(
-              color: TaggyColors
-                  .textSecondary,
-              fontSize: 11,
+              color: TaggyColors.textSecondary,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
             ),
           ),
-
           const SizedBox(height: 2),
-
           Text(
             valor,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight:
-                  FontWeight.bold,
-            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -4535,56 +5032,34 @@ class InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin:
-          const EdgeInsets.only(
-        bottom: 11,
-      ),
-      padding:
-          const EdgeInsets.all(15),
+      margin: const EdgeInsets.only(bottom: 11),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: TaggyColors.surface,
-        borderRadius:
-            BorderRadius.circular(18),
-        border: Border.all(
-          color:
-              const Color(0xFF182B44),
-        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF182B44)),
       ),
       child: Row(
         children: [
           Container(
-            padding:
-                const EdgeInsets.all(
-              10,
-            ),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: TaggyColors.blue
-                  .withOpacity(0.12),
-              borderRadius:
-                  BorderRadius.circular(
-                12,
-              ),
+              color: TaggyColors.blue.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icono,
-              color:
-                  TaggyColors.lightBlue,
-            ),
+            child: Icon(icono, color: TaggyColors.lightBlue),
           ),
 
           const SizedBox(width: 14),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   titulo,
-                  style:
-                      const TextStyle(
-                    color: TaggyColors
-                        .textSecondary,
+                  style: const TextStyle(
+                    color: TaggyColors.textSecondary,
                     fontSize: 12,
                   ),
                 ),
@@ -4593,11 +5068,7 @@ class InfoCard extends StatelessWidget {
 
                 Text(
                   valor,
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.w600,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -4627,53 +5098,34 @@ class AlertaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin:
-          const EdgeInsets.only(
-        bottom: 12,
-      ),
-      padding:
-          const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: TaggyColors.surface,
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding:
-                const EdgeInsets.all(
-              11,
-            ),
+            padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(
-              color:
-                  color.withOpacity(0.14),
-              borderRadius:
-                  BorderRadius.circular(
-                13,
-              ),
+              color: color.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(
-              icono,
-              color: color,
-            ),
+            child: Icon(icono, color: color),
           ),
 
           const SizedBox(width: 14),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   titulo,
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
@@ -4682,10 +5134,8 @@ class AlertaCard extends StatelessWidget {
 
                 Text(
                   descripcion,
-                  style:
-                      const TextStyle(
-                    color: TaggyColors
-                        .textSecondary,
+                  style: const TextStyle(
+                    color: TaggyColors.textSecondary,
                     height: 1.35,
                   ),
                 ),
@@ -4694,13 +5144,7 @@ class AlertaCard extends StatelessWidget {
 
                 Text(
                   tiempo,
-                  style: TextStyle(
-                    color:
-                        color.withOpacity(
-                      0.9,
-                    ),
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: color.withOpacity(0.9), fontSize: 12),
                 ),
               ],
             ),
@@ -4711,36 +5155,23 @@ class AlertaCard extends StatelessWidget {
   }
 }
 
-class StatusBadge
-    extends StatelessWidget {
+class StatusBadge extends StatelessWidget {
   final bool extraviada;
 
-  const StatusBadge({
-    super.key,
-    required this.extraviada,
-  });
+  const StatusBadge({super.key, required this.extraviada});
 
   @override
   Widget build(BuildContext context) {
-    final color = extraviada
-        ? TaggyColors.red
-        : TaggyColors.green;
+    final color = extraviada ? TaggyColors.red : TaggyColors.green;
 
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 11,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
       decoration: BoxDecoration(
         color: color.withOpacity(0.13),
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        extraviada
-            ? '● EXTRAVIADA'
-            : '● SEGURA',
+        extraviada ? 'â— EXTRAVIADA' : 'â— SEGURA',
         style: TextStyle(
           color: color,
           fontSize: 11,
@@ -4751,29 +5182,21 @@ class StatusBadge
   }
 }
 
-class SectionTitle
-    extends StatelessWidget {
+class SectionTitle extends StatelessWidget {
   final String titulo;
 
-  const SectionTitle({
-    super.key,
-    required this.titulo,
-  });
+  const SectionTitle({super.key, required this.titulo});
 
   @override
   Widget build(BuildContext context) {
     return Text(
       titulo,
-      style: const TextStyle(
-        fontSize: 19,
-        fontWeight: FontWeight.bold,
-      ),
+      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
     );
   }
 }
 
-class CampoMascota
-    extends StatelessWidget {
+class CampoMascota extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final String? hint;
@@ -4799,9 +5222,7 @@ class CampoMascota
         prefixIcon: Icon(icono),
       ),
       validator: (value) {
-        if (requerido &&
-            (value == null ||
-                value.trim().isEmpty)) {
+        if (requerido && (value == null || value.trim().isEmpty)) {
           return 'Este campo es obligatorio';
         }
 
@@ -4811,54 +5232,37 @@ class CampoMascota
   }
 }
 
-class DeviceStatusCard
-    extends StatelessWidget {
-  const DeviceStatusCard({
-    super.key,
-  });
+class DeviceStatusCard extends StatelessWidget {
+  const DeviceStatusCard({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: TaggyColors.surface,
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: const Row(
         children: [
-          Icon(
-            Icons.memory,
-            color: TaggyColors.cyan,
-            size: 34,
-          ),
+          Icon(Icons.memory, color: TaggyColors.cyan, size: 34),
 
           SizedBox(width: 15),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Collar TAGGY',
-                  style: TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
 
                 SizedBox(height: 3),
 
                 Text(
                   'TAGGY-X72F82',
-                  style: TextStyle(
-                    color: TaggyColors
-                        .textSecondary,
-                  ),
+                  style: TextStyle(color: TaggyColors.textSecondary),
                 ),
               ],
             ),
@@ -4879,8 +5283,7 @@ class StatusDot extends StatelessWidget {
     return Container(
       width: 11,
       height: 11,
-      decoration:
-          const BoxDecoration(
+      decoration: const BoxDecoration(
         color: TaggyColors.green,
         shape: BoxShape.circle,
       ),
@@ -4888,52 +5291,36 @@ class StatusDot extends StatelessWidget {
   }
 }
 
-class EmptyMascotasCard
-    extends StatelessWidget {
+class EmptyMascotasCard extends StatelessWidget {
   final VoidCallback onPressed;
 
-  const EmptyMascotasCard({
-    super.key,
-    required this.onPressed,
-  });
+  const EmptyMascotasCard({super.key, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.all(25),
+      padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
         color: TaggyColors.surface,
-        borderRadius:
-            BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.pets,
-            size: 60,
-            color:
-                TaggyColors.textSecondary,
-          ),
+          const Icon(Icons.pets, size: 60, color: TaggyColors.textSecondary),
 
           const SizedBox(height: 15),
 
           const Text(
             'No tienes mascotas registradas',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 15),
 
           FilledButton.icon(
             onPressed: onPressed,
-            icon:
-                const Icon(Icons.add),
-            label: const Text(
-              'Agregar mascota',
-            ),
+            icon: const Icon(Icons.add),
+            label: const Text('Agregar mascota'),
           ),
         ],
       ),

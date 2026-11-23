@@ -12,21 +12,6 @@ const cors = require("cors");
 
 const crypto = require("crypto");
 
-const webpush = require("web-push");
-
-const { iniciarMonitorAlertas } = require("./monitor_alertas");
-const {
-  prepararEsquemaCargaTAGGY,
-  registrarRutaEstadoCarga
-} = require("./carga_taggy");
-const { notificarQr, notificarAvistamiento } = require("./push_eventos");
-
-const {
-  prepararEsquemaGeocercaTAGGY,
-  registrarRutasGeocerca,
-  evaluarGeocerca
-} = require("./geocerca_taggy");
-
 require("dotenv").config();
 
 
@@ -41,9 +26,7 @@ const app = express();
 
 app.use(cors());
 
-app.use(express.json());
-
-registrarRutaEstadoCarga({ app, db, enviarPushUsuario });
+app.use(express.json({ limit: "5mb" }));
 
 
 
@@ -58,114 +41,6 @@ app.use(
 );
 
 
-
-
-// ======================================================
-// WEB PUSH / NOTIFICACIONES TAGGY
-// ======================================================
-
-function configurarWebPushTAGGY() {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT;
-
-  if (!publicKey || !privateKey || !subject) {
-    console.warn(
-      "Web Push desactivado: faltan variables VAPID"
-    );
-    return false;
-  }
-
-  webpush.setVapidDetails(
-    subject,
-    publicKey,
-    privateKey
-  );
-
-  return true;
-}
-
-const webPushActivo = configurarWebPushTAGGY();
-
-async function enviarPushUsuario(
-  usuarioId,
-  payload
-) {
-  if (!webPushActivo) {
-    return {
-      enviados: 0,
-      eliminados: 0
-    };
-  }
-
-  const resultado = await db.query(
-    `
-      SELECT
-        id,
-        endpoint,
-        p256dh,
-        auth
-      FROM push_suscripciones
-      WHERE usuario_id = $1
-        AND activa = TRUE
-    `,
-    [usuarioId]
-  );
-
-  let enviados = 0;
-  let eliminados = 0;
-
-  for (const fila of resultado.rows) {
-    const subscription = {
-      endpoint: fila.endpoint,
-      keys: {
-        p256dh: fila.p256dh,
-        auth: fila.auth
-      }
-    };
-
-    try {
-      await webpush.sendNotification(
-        subscription,
-        JSON.stringify(payload),
-        {
-          TTL: 3600,
-          urgency: "high"
-        }
-      );
-
-      enviados++;
-    } catch (error) {
-      if (
-        error.statusCode === 404 ||
-        error.statusCode === 410
-      ) {
-        await db.query(
-          `
-            UPDATE push_suscripciones
-            SET
-              activa = FALSE,
-              fecha_actualizacion = CURRENT_TIMESTAMP
-            WHERE id = $1
-          `,
-          [fila.id]
-        );
-
-        eliminados++;
-      } else {
-        console.error(
-          "Error enviando Web Push:",
-          error.statusCode || error.message
-        );
-      }
-    }
-  }
-
-  return {
-    enviados,
-    eliminados
-  };
-}
 
 function verificarToken(req, res, next) {
 
@@ -232,12 +107,6 @@ function verificarToken(req, res, next) {
 }
 
 
-
-registrarRutasGeocerca({
-  app,
-  db,
-  verificarToken
-});
 
 app.get("/", (req, res) => {
 
@@ -954,7 +823,7 @@ app.put("/api/mascotas/:id", verificarToken, async (req, res) => {
 
         senas_particulares = $7,
 
-        foto_url = $8,
+        foto_url = COALESCE($8, foto_url),
 
         fecha_actualizacion = CURRENT_TIMESTAMP
 
@@ -982,7 +851,7 @@ app.put("/api/mascotas/:id", verificarToken, async (req, res) => {
 
         senas_particulares || null,
 
-        foto_url || null,
+        foto_url === undefined ? null : foto_url,
 
         mascotaId,
 
@@ -1096,7 +965,7 @@ app.delete("/api/mascotas/:id", verificarToken, async (req, res) => {
 
   }
 
-});
+})
 
 
 // ======================================================
@@ -1163,6 +1032,7 @@ app.put("/api/mascotas/:id/extravio", verificarToken, async (req, res) => {
           mascota_id,
           tipo,
           origen,
+   
           descripcion,
           datos
         )
@@ -1186,29 +1056,6 @@ app.put("/api/mascotas/:id/extravio", verificarToken, async (req, res) => {
     );
 
     await client.query("COMMIT");
-    // Push modo extravio TAGGY
-    try {
-      await enviarPushUsuario(
-        req.usuario.id,
-        {
-          title: extraviada
-            ? "🚨 Modo extravío activado"
-            : "✅ Modo extravío desactivado",
-
-          body: extraviada
-            ? `${resultado.rows[0].nombre} fue marcada como extraviada.`
-            : `${resultado.rows[0].nombre} fue marcada como encontrada.`,
-
-          url: "/TAGGYBACKEND/"
-        }
-      );
-    } catch (pushError) {
-      console.error(
-        "Error Push modo extravío:",
-        pushError.message
-      );
-    }
-
 
     res.json({
       mensaje: extraviada
@@ -1597,23 +1444,7 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
     await client.query("COMMIT");
 
-    try {
-      await evaluarGeocerca({
-        db,
-        enviarPushUsuario,
-        mascotaId:
-          dispositivo.rows[0].mascota_id,
-        latitud,
-        longitud,
-        precisionMetros:
-          accuracy ?? null
-      });
-    } catch (geoError) {
-      console.error(
-        "Error evaluando geocerca:",
-        geoError.message
-      );
-    }
+
 
     res.status(201).json({
 
@@ -1653,124 +1484,6 @@ app.post("/api/device/:deviceUid/location", async (req, res) => {
 
 });
 
-
-// ======================================================
-// HISTORIAL DE UBICACIONES DE UNA MASCOTA
-// ======================================================
-
-app.get(
-  "/api/mascotas/:id/ubicaciones",
-  verificarToken,
-  async (req, res) => {
-    try {
-      const mascotaId = req.params.id;
-
-      let horas = Number(req.query.horas || 24);
-      let limite = Number(req.query.limite || 500);
-
-      if (!Number.isFinite(horas)) {
-        horas = 24;
-      }
-
-      if (!Number.isFinite(limite)) {
-        limite = 500;
-      }
-
-      horas = Math.min(
-        Math.max(Math.floor(horas), 1),
-        720
-      );
-
-      limite = Math.min(
-        Math.max(Math.floor(limite), 2),
-        1000
-      );
-
-      const mascota = await db.query(
-        `
-          SELECT
-            id,
-            nombre
-          FROM mascotas
-          WHERE id = $1
-            AND usuario_id = $2
-        `,
-        [
-          mascotaId,
-          req.usuario.id
-        ]
-      );
-
-      if (mascota.rows.length === 0) {
-        return res.status(404).json({
-          mensaje: "Mascota no encontrada"
-        });
-      }
-
-      const resultado = await db.query(
-        `
-          SELECT *
-          FROM (
-            SELECT
-              u.id,
-              u.latitud,
-              u.longitud,
-              u.altitud,
-              u.precision_metros,
-              u.bateria_porcentaje,
-              u.modo,
-              u.fecha_gps,
-              u.fecha_recepcion,
-              d.device_uid
-
-            FROM ubicaciones u
-
-            JOIN dispositivos d
-              ON d.id = u.dispositivo_id
-
-            WHERE d.mascota_id = $1
-              AND u.fecha_recepcion >=
-                  CURRENT_TIMESTAMP
-                  - ($2 * INTERVAL '1 hour')
-
-            ORDER BY u.fecha_recepcion DESC
-
-            LIMIT $3
-          ) historial
-
-          ORDER BY fecha_recepcion ASC
-        `,
-        [
-          mascotaId,
-          horas,
-          limite
-        ]
-      );
-
-      res.json({
-        mascota: {
-          id: mascota.rows[0].id,
-          nombre: mascota.rows[0].nombre
-        },
-
-        periodo_horas: horas,
-        total: resultado.rows.length,
-        ubicaciones: resultado.rows
-      });
-
-    } catch (error) {
-      console.error(
-        "Error historial de ubicaciones:",
-        error
-      );
-
-      res.status(500).json({
-        mensaje: "Error interno del servidor"
-      });
-    }
-  }
-);
-
 app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) => {
 
   try {
@@ -1796,7 +1509,6 @@ app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) =
         d.device_uid,
 
         d.bateria_porcentaje,
-        d.cargando,
 
         d.modo,
 
@@ -1909,7 +1621,6 @@ app.get("/api/mascotas/:id/ultima-ubicacion", verificarToken, async (req, res) =
         device_uid: datos.device_uid,
 
         bateria: datos.bateria_porcentaje,
-        cargando: datos.cargando,
 
         modo: datos.modo,
 
@@ -2581,7 +2292,7 @@ app.get("/api/device/:deviceUid/config", async (req, res) => {
 
       case "extravio":
 
-        intervaloUbicacion = 10;
+        intervaloUbicacion = 30;
 
         break;
 
@@ -2589,7 +2300,7 @@ app.get("/api/device/:deviceUid/config", async (req, res) => {
 
       case "mantenimiento":
 
-        intervaloUbicacion = 300;
+        intervaloUbicacion = 900;
 
         break;
 
@@ -2597,7 +2308,7 @@ app.get("/api/device/:deviceUid/config", async (req, res) => {
 
       default:
 
-        intervaloUbicacion = 30;
+        intervaloUbicacion = 300;
 
     }
 
@@ -2794,7 +2505,6 @@ app.get("/api/public/pet/:token", async (req, res) => {
       SELECT
 
         m.id AS mascota_id,
-        m.usuario_id AS usuario_id,
 
         m.nombre,
 
@@ -2922,13 +2632,6 @@ app.get("/api/public/pet/:token", async (req, res) => {
 
 
 
-    await notificarQr({
-      db,
-      enviarPushUsuario,
-      usuarioId: datos.usuario_id,
-      mascotaId: datos.mascota_id,
-      nombre: datos.nombre
-    });
     res.json({
 
       mascota: {
@@ -3200,7 +2903,7 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
       SELECT
 
         q.mascota_id,
-        m.usuario_id AS usuario_id,
+
         m.nombre AS mascota_nombre
 
       FROM qr_tokens q
@@ -3362,14 +3065,6 @@ app.post("/api/public/pet/:token/sighting", async (req, res) => {
 
 
     await client.query("COMMIT");
-    await notificarAvistamiento({
-      enviarPushUsuario,
-      usuarioId: qr.rows[0].usuario_id,
-      nombreMascota: qr.rows[0].mascota_nombre,
-      nombreReportante: nombre || null,
-      latitud,
-      longitud
-    });
 
 
 
@@ -3559,161 +3254,7 @@ res.json({
 
 });
 
-
-// ======================================================
-// PUSH - CLAVE PUBLICA
-// ======================================================
-
-app.get("/api/push/public-key", (req, res) => {
-  if (!process.env.VAPID_PUBLIC_KEY) {
-    return res.status(503).json({
-      mensaje: "Web Push no configurado"
-    });
-  }
-
-  res.json({
-    publicKey: process.env.VAPID_PUBLIC_KEY
-  });
-});
-
-// ======================================================
-// PUSH - REGISTRAR SUSCRIPCION
-// ======================================================
-
-app.post(
-  "/api/push/subscribe",
-  verificarToken,
-  async (req, res) => {
-    try {
-      const {
-        endpoint,
-        keys,
-        plataforma,
-        user_agent
-      } = req.body;
-
-      if (
-        !endpoint ||
-        !keys ||
-        !keys.p256dh ||
-        !keys.auth
-      ) {
-        return res.status(400).json({
-          mensaje: "Suscripción Push incompleta"
-        });
-      }
-
-      const resultado = await db.query(
-        `
-          INSERT INTO push_suscripciones (
-            usuario_id,
-            endpoint,
-            p256dh,
-            auth,
-            plataforma,
-            user_agent,
-            activa,
-            fecha_actualizacion
-          )
-          VALUES (
-            $1,$2,$3,$4,$5,$6,TRUE,CURRENT_TIMESTAMP
-          )
-          ON CONFLICT (endpoint)
-          DO UPDATE SET
-            usuario_id = EXCLUDED.usuario_id,
-            p256dh = EXCLUDED.p256dh,
-            auth = EXCLUDED.auth,
-            plataforma = EXCLUDED.plataforma,
-            user_agent = EXCLUDED.user_agent,
-            activa = TRUE,
-            fecha_actualizacion = CURRENT_TIMESTAMP
-          RETURNING id
-        `,
-        [
-          req.usuario.id,
-          endpoint,
-          keys.p256dh,
-          keys.auth,
-          plataforma || "web",
-          user_agent || null
-        ]
-      );
-
-      res.status(201).json({
-        mensaje: "Notificaciones activadas",
-        suscripcion_id: resultado.rows[0].id
-      });
-
-    } catch (error) {
-      console.error(
-        "Error registrando Push:",
-        error
-      );
-
-      res.status(500).json({
-        mensaje: "Error interno del servidor"
-      });
-    }
-  }
-);
-
-// ======================================================
-// PUSH - PRUEBA
-// ======================================================
-
-app.post(
-  "/api/push/test",
-  verificarToken,
-  async (req, res) => {
-    try {
-      const resultado =
-        await enviarPushUsuario(
-          req.usuario.id,
-          {
-            title: "TAGGY",
-            body: "Las notificaciones funcionan correctamente 🐾",
-            url: "/TAGGYBACKEND/"
-          }
-        );
-
-      res.json({
-        mensaje: "Prueba Push procesada",
-        ...resultado
-      });
-
-    } catch (error) {
-      console.error(
-        "Error en Push de prueba:",
-        error
-      );
-
-      res.status(500).json({
-        mensaje: "Error interno del servidor"
-      });
-    }
-  }
-);
-
-app.listen(PORT, "0.0.0.0", async () => {
-
-  try {
-    await prepararEsquemaCargaTAGGY(db);
-  } catch (error) {
-    console.error(
-      "Error preparando esquema de carga:",
-      error
-    );
-  }
-  try {
-    await prepararEsquemaGeocercaTAGGY(db);
-  } catch (error) {
-    console.error(
-      "Error preparando esquema geocerca:",
-      error
-    );
-  }
-
-  iniciarMonitorAlertas({ db, enviarPushUsuario });
+app.listen(PORT, "0.0.0.0", () => {
 
   console.log(`Servidor TAGGY funcionando en puerto ${PORT}`);
 

@@ -19,6 +19,35 @@ async function cargarMascota() {
         const mascota = datos.mascota;
         const contacto = datos.contacto;
 
+        const imagenMascota =
+            document.getElementById("imagenMascota");
+
+        const fotoPlaceholder =
+            document.getElementById("fotoPlaceholder");
+
+        if (
+            mascota.foto_url &&
+            imagenMascota
+        ) {
+            imagenMascota.src = mascota.foto_url;
+
+            imagenMascota.onload = () => {
+                imagenMascota.style.display = "block";
+
+                if (fotoPlaceholder) {
+                    fotoPlaceholder.style.display = "none";
+                }
+            };
+
+            imagenMascota.onerror = () => {
+                imagenMascota.style.display = "none";
+
+                if (fotoPlaceholder) {
+                    fotoPlaceholder.style.display = "inline";
+                }
+            };
+        }
+
         document.getElementById(
             "nombreMascota"
         ).textContent = mascota.nombre;
@@ -26,7 +55,7 @@ async function cargarMascota() {
         document.getElementById(
             "tipoMascota"
         ).textContent =
-            `${mascota.especie} · ${mascota.raza || ""}`;
+            `${mascota.especie} Â· ${mascota.raza || ""}`;
 
         document.getElementById(
             "sexo"
@@ -42,7 +71,7 @@ async function cargarMascota() {
             "senas"
         ).textContent =
             mascota.senas_particulares ||
-            "Sin información";
+            "Sin informaciÃ³n";
 
         document.getElementById(
             "propietario"
@@ -108,13 +137,13 @@ btnUbicacion.addEventListener("click", () => {
     if (!navigator.geolocation) {
 
         estadoUbicacion.textContent =
-            "Tu navegador no permite obtener la ubicación.";
+            "Tu navegador no permite obtener la ubicaciÃ³n.";
 
         return;
     }
 
     estadoUbicacion.textContent =
-        "Obteniendo ubicación...";
+        "Obteniendo ubicaciÃ³n...";
 
     navigator.geolocation.getCurrentPosition(
 
@@ -130,7 +159,7 @@ btnUbicacion.addEventListener("click", () => {
                 position.coords.accuracy;
 
             estadoUbicacion.textContent =
-                "✅ Ubicación obtenida correctamente";
+                "âœ… UbicaciÃ³n obtenida correctamente";
         },
 
         (error) => {
@@ -138,7 +167,7 @@ btnUbicacion.addEventListener("click", () => {
             console.error(error);
 
             estadoUbicacion.textContent =
-                "No fue posible obtener tu ubicación. Puedes enviar el reporte sin ella.";
+                "No fue posible obtener tu ubicaciÃ³n. Puedes enviar el reporte sin ella.";
         },
 
         {
@@ -219,7 +248,7 @@ formulario.addEventListener("submit", async (event) => {
         }
 
         resultadoAvistamiento.textContent =
-            "✅ Avistamiento enviado correctamente";
+            "âœ… Avistamiento enviado correctamente";
 
         formulario.reset();
 
@@ -236,6 +265,6 @@ formulario.addEventListener("submit", async (event) => {
         console.error(error);
 
         resultadoAvistamiento.textContent =
-            "❌ No se pudo enviar el avistamiento";
+            "âŒ No se pudo enviar el avistamiento";
     }
 });
