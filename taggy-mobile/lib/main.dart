@@ -419,7 +419,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (correo.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa tu correo y contraseÃ±a.')),
+        const SnackBar(content: Text('Ingresa tu correo y contraseña.')),
       );
       return;
     }
@@ -430,7 +430,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inicio de sesiÃ³n correcto')),
+        const SnackBar(content: Text('Inicio de sesión correcto')),
       );
 
       Navigator.pushAndRemoveUntil(
@@ -489,7 +489,7 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 8),
 
                 const Text(
-                  'ProtecciÃ³n inteligente para tu mascota',
+                  'Protección inteligente para tu mascota',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: TaggyColors.textSecondary),
                 ),
@@ -499,7 +499,7 @@ class _LoginPageState extends State<LoginPage> {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Iniciar sesiÃ³n',
+                    'Iniciar sesión',
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -510,7 +510,7 @@ class _LoginPageState extends State<LoginPage> {
                   controller: correoController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: 'Correo electrÃ³nico',
+                    labelText: 'Correo electrónico',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
@@ -521,7 +521,7 @@ class _LoginPageState extends State<LoginPage> {
                   controller: passwordController,
                   obscureText: ocultarPassword,
                   decoration: InputDecoration(
-                    labelText: 'ContraseÃ±a',
+                    labelText: 'Contraseña',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       onPressed: () {
@@ -546,7 +546,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: FilledButton(
                     onPressed: iniciarSesion,
                     child: const Text(
-                      'Iniciar sesiÃ³n',
+                      'Iniciar sesión',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -557,7 +557,7 @@ class _LoginPageState extends State<LoginPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Â¿No tienes cuenta?'),
+                    const Text('¿No tienes cuenta?'),
                     TextButton(
                       onPressed: () {
                         Navigator.push(
@@ -622,7 +622,7 @@ class _RegistroPageState extends State<RegistroPage> {
 
     if (password != confirmar) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Las contraseÃ±as no coinciden.')),
+        const SnackBar(content: Text('Las contraseñas no coinciden.')),
       );
       return;
     }
@@ -695,7 +695,7 @@ class _RegistroPageState extends State<RegistroPage> {
           TextField(
             controller: correoController,
             decoration: const InputDecoration(
-              labelText: 'Correo electrÃ³nico',
+              labelText: 'Correo electrónico',
               prefixIcon: Icon(Icons.email),
             ),
           ),
@@ -706,7 +706,7 @@ class _RegistroPageState extends State<RegistroPage> {
             controller: telefonoController,
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(
-              labelText: 'TelÃ©fono',
+              labelText: 'Teléfono',
               prefixIcon: Icon(Icons.phone),
             ),
           ),
@@ -717,7 +717,7 @@ class _RegistroPageState extends State<RegistroPage> {
             controller: passwordController,
             obscureText: true,
             decoration: const InputDecoration(
-              labelText: 'ContraseÃ±a',
+              labelText: 'Contraseña',
               prefixIcon: Icon(Icons.lock),
             ),
           ),
@@ -728,7 +728,7 @@ class _RegistroPageState extends State<RegistroPage> {
             controller: confirmarController,
             obscureText: true,
             decoration: const InputDecoration(
-              labelText: 'Confirmar contraseÃ±a',
+              labelText: 'Confirmar contraseña',
               prefixIcon: Icon(Icons.lock_reset),
             ),
           ),
@@ -779,7 +779,7 @@ class _HomePageState extends State<HomePage> {
       nombre: 'Max',
       especie: 'Perro',
       raza: 'Labrador',
-      edad: '3 aÃ±os',
+      edad: '3 años',
       sexo: 'Macho',
       color: 'Amarillo',
       peso: '28 kg',
@@ -804,7 +804,7 @@ class _HomePageState extends State<HomePage> {
             }
           }
         } catch (_) {
-          // Ignoramos datos locales antiguos o daÃ±ados.
+          // Ignoramos datos locales antiguos o dañados.
         }
       }
 
@@ -899,7 +899,7 @@ class _HomePageState extends State<HomePage> {
     final original = mascotas[index];
 
     if (original.id == null) {
-      throw Exception('La mascota no tiene un ID vÃ¡lido.');
+      throw Exception('La mascota no tiene un ID válido.');
     }
 
     try {
@@ -943,7 +943,7 @@ class _HomePageState extends State<HomePage> {
     final mascota = mascotas[index];
 
     if (mascota.id == null) {
-      throw Exception('La mascota no tiene un ID vÃ¡lido.');
+      throw Exception('La mascota no tiene un ID válido.');
     }
 
     try {
@@ -972,7 +972,7 @@ class _HomePageState extends State<HomePage> {
     final mascota = mascotas[index];
 
     if (mascota.id == null) {
-      throw Exception('La mascota no tiene un ID vÃ¡lido.');
+      throw Exception('La mascota no tiene un ID válido.');
     }
 
     try {
@@ -1061,7 +1061,7 @@ class _HomePageState extends State<HomePage> {
             NavigationDestination(
               icon: Icon(Icons.location_on_outlined),
               selectedIcon: Icon(Icons.location_on, color: TaggyColors.blue),
-              label: 'UbicaciÃ³n',
+              label: 'Ubicación',
             ),
             NavigationDestination(
               icon: Icon(Icons.notifications_outlined),
@@ -1190,8 +1190,8 @@ class InicioPage extends StatelessWidget {
                   Expanded(
                     child: Text(
                       mascota.extraviada
-                          ? 'ExtravÃ­o activo para ${mascota.nombre}'
-                          : '${mascota.nombre} estÃ¡ segura',
+                          ? 'Extravío activo para ${mascota.nombre}'
+                          : '${mascota.nombre} está segura',
                       style: TextStyle(
                         color: mascota.extraviada
                             ? TaggyColors.red
@@ -1219,7 +1219,7 @@ class InicioPage extends StatelessWidget {
                       onCambiarPagina(2);
                     },
                     icon: const Icon(Icons.location_on_rounded, size: 20),
-                    label: const Text('UbicaciÃ³n'),
+                    label: const Text('Ubicación'),
                   ),
                 ),
 
@@ -1244,7 +1244,7 @@ class InicioPage extends StatelessWidget {
                       );
                     },
                     icon: const Icon(Icons.warning_amber_rounded, size: 20),
-                    label: Text(mascota.extraviada ? 'ExtravÃ­o' : 'Reportar'),
+                    label: Text(mascota.extraviada ? 'Extravío' : 'Reportar'),
                   ),
                 ),
               ],
@@ -1253,7 +1253,7 @@ class InicioPage extends StatelessWidget {
             const SizedBox(height: 30),
 
             const Text(
-              'MÃ¡s',
+              'Más',
               style: TextStyle(
                 color: TaggyColors.textPrimary,
                 fontSize: 22,
@@ -1273,8 +1273,8 @@ class InicioPage extends StatelessWidget {
               childAspectRatio: 1.35,
               children: [
                 QuickActionCard(
-                  titulo: 'CÃ³digo QR',
-                  subtitulo: 'Perfil pÃºblico',
+                  titulo: 'Código QR',
+                  subtitulo: 'Perfil público',
                   icono: Icons.qr_code_2_rounded,
                   color: TaggyColors.blue,
                   onTap: () {
@@ -1288,7 +1288,7 @@ class InicioPage extends StatelessWidget {
                 ),
                 QuickActionCard(
                   titulo: 'Seguridad',
-                  subtitulo: 'ProtecciÃ³n TAGGY',
+                  subtitulo: 'Protección TAGGY',
                   icono: Icons.shield_outlined,
                   color: TaggyColors.green,
                   onTap: () {
@@ -1605,7 +1605,7 @@ class _AgregarMascotaPageState extends State<AgregarMascotaPage> {
                     ),
                   ),
                   const Text(
-                    'Puedes elegir una imagen de tu galerÃ­a o usar la cÃ¡mara.',
+                    'Puedes elegir una imagen de tu galería o usar la cámara.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: TaggyColors.textSecondary,
@@ -1661,7 +1661,7 @@ class _AgregarMascotaPageState extends State<AgregarMascotaPage> {
             CampoMascota(
               controller: edadController,
               label: 'Edad',
-              hint: 'Ejemplo: 3 aÃ±os',
+              hint: 'Ejemplo: 3 años',
               icono: Icons.cake_outlined,
             ),
 
@@ -1803,7 +1803,7 @@ class _DetalleMascotaPageState extends State<DetalleMascotaPage> {
         return AlertDialog(
           backgroundColor: TaggyColors.surface,
           title: const Text('Eliminar mascota'),
-          content: Text('Â¿Seguro que deseas eliminar a ${mascota.nombre}?'),
+          content: Text('¿Seguro que deseas eliminar a ${mascota.nombre}?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -2282,7 +2282,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
       setState(() {
         cargando = false;
         datosUbicacion = null;
-        error = 'La mascota todavÃ­a no tiene un ID vÃ¡lido.';
+        error = 'La mascota todavía no tiene un ID válido.';
       });
 
       return;
@@ -2411,7 +2411,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
       return 'Ayer';
     }
 
-    return 'Hace ${diferencia.inDays} dÃ­as';
+    return 'Hace ${diferencia.inDays} días';
   }
 
   String _textoBateria(dynamic bateria) {
@@ -2474,7 +2474,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
     if (latitud == null || longitud == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo obtener una ubicaciÃ³n vÃ¡lida.'),
+          content: Text('No se pudo obtener una ubicación válida.'),
         ),
       );
 
@@ -2514,7 +2514,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
                     const SizedBox(height: 12),
 
                     Text(
-                      'El punto elegido en el mapa serÃ¡ el centro de la zona segura.',
+                      'El punto elegido en el mapa será el centro de la zona segura.',
                       style: const TextStyle(color: TaggyColors.textSecondary),
                     ),
 
@@ -2699,12 +2699,12 @@ class _UbicacionPageState extends State<UbicacionPage> {
               children: [
                 const Expanded(
                   child: Text(
-                    'UbicaciÃ³n',
+                    'Ubicación',
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Actualizar ubicaciÃ³n',
+                  tooltip: 'Actualizar ubicación',
                   onPressed: cargando ? null : cargarUbicacion,
                   icon: const Icon(Icons.refresh_rounded),
                 ),
@@ -2764,7 +2764,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
                     ),
                     SizedBox(height: 12),
                     Text(
-                      'Agrega una mascota para consultar su ubicaciÃ³n.',
+                      'Agrega una mascota para consultar su ubicación.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: TaggyColors.textSecondary),
                     ),
@@ -2812,7 +2812,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
                   segments: const [
                     ButtonSegment<int>(value: 0, label: Text('Ahora')),
                     ButtonSegment<int>(value: 24, label: Text('24 h')),
-                    ButtonSegment<int>(value: 168, label: Text('7 dÃ­as')),
+                    ButtonSegment<int>(value: 168, label: Text('7 días')),
                   ],
                   selected: <int>{horasHistorial ?? 0},
                   onSelectionChanged: (seleccion) {
@@ -2994,7 +2994,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
                 const Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    'Â© OpenStreetMap contributors',
+                    '© OpenStreetMap contributors',
                     style: TextStyle(
                       color: TaggyColors.textSecondary,
                       fontSize: 10,
@@ -3011,7 +3011,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
                     child: MiniStatusCard(
                       icono: Icons.gps_fixed,
                       titulo: 'GPS',
-                      valor: tieneUbicacion ? 'Activo' : 'Sin seÃ±al',
+                      valor: tieneUbicacion ? 'Activo' : 'Sin señal',
                       color: tieneUbicacion
                           ? TaggyColors.green
                           : TaggyColors.orange,
@@ -3032,7 +3032,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
                   Expanded(
                     child: MiniStatusCard(
                       icono: Icons.battery_5_bar,
-                      titulo: 'BaterÃ­a',
+                      titulo: 'Batería',
                       valor: bateria,
                       color: TaggyColors.cyan,
                     ),
@@ -3086,7 +3086,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
                               Text(
                                 geocerca == null
                                     ? 'Sin configurar'
-                                    : '${geocerca?['nombre'] ?? 'Casa'} Â· ${geocerca?['radio_metros'] ?? 100} m',
+                                    : '${geocerca?['nombre'] ?? 'Casa'} · ${geocerca?['radio_metros'] ?? 100} m',
                                 style: TextStyle(
                                   color: TaggyColors.textSecondary,
                                   fontSize: 12,
@@ -3124,13 +3124,13 @@ class _UbicacionPageState extends State<UbicacionPage> {
 
               InfoCard(
                 icono: Icons.access_time,
-                titulo: 'Ãšltima ubicaciÃ³n',
+                titulo: 'Última ubicación',
                 valor: _tiempoRelativo(fechaRecepcion),
               ),
 
               InfoCard(
                 icono: Icons.router_outlined,
-                titulo: 'Ãšltima conexiÃ³n del collar',
+                titulo: 'Última conexión del collar',
                 valor: _tiempoRelativo(ultimaConexion),
               ),
 
@@ -3143,7 +3143,7 @@ class _UbicacionPageState extends State<UbicacionPage> {
               const SizedBox(height: 8),
 
               const Text(
-                'Desliza hacia abajo o usa el botÃ³n de actualizar para consultar la posiciÃ³n mÃ¡s reciente.',
+                'Desliza hacia abajo o usa el botón de actualizar para consultar la posición más reciente.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: TaggyColors.textSecondary,
@@ -3290,10 +3290,10 @@ class _AlertasPageState extends State<AlertasPage> {
               nuevasAlertas.add(
                 _TaggyAlerta(
                   tipo: 'BATERIA_BAJA_ACTUAL',
-                  titulo: bateria <= 10 ? 'BaterÃ­a crÃ­tica' : 'BaterÃ­a baja',
+                  titulo: bateria <= 10 ? 'Batería crítica' : 'Batería baja',
                   descripcion:
                       'El collar de ${mascota.nombre} '
-                      'tiene $bateria% de baterÃ­a.',
+                      'tiene $bateria% de batería.',
                   fecha: ultimaConexion ?? DateTime.now(),
                   icono: Icons.battery_alert_rounded,
                   color: bateria <= 10 ? TaggyColors.red : TaggyColors.orange,
@@ -3330,7 +3330,7 @@ class _AlertasPageState extends State<AlertasPage> {
                 nuevasAlertas.add(
                   _TaggyAlerta(
                     tipo: 'COLLAR_OFFLINE',
-                    titulo: 'Collar sin conexiÃ³n',
+                    titulo: 'Collar sin conexión',
                     descripcion:
                         'TAGGY no ha recibido datos '
                         'del collar de '
@@ -3384,7 +3384,7 @@ class _AlertasPageState extends State<AlertasPage> {
       return '${diferencia.inHours} horas';
     }
 
-    return '${diferencia.inDays} dÃ­as';
+    return '${diferencia.inDays} días';
   }
 
   _TaggyAlerta _crearAlerta({
@@ -3408,9 +3408,9 @@ class _AlertasPageState extends State<AlertasPage> {
       case 'QR_SCAN':
         return _TaggyAlerta(
           tipo: tipo,
-          titulo: 'CÃ³digo QR escaneado',
+          titulo: 'Código QR escaneado',
           descripcion:
-              'Se consultÃ³ el perfil pÃºblico de ${mascota.nombre} mediante su cÃ³digo QR.',
+              'Se consultó el perfil público de ${mascota.nombre} mediante su código QR.',
           fecha: fecha,
           icono: Icons.qr_code_2_rounded,
           color: TaggyColors.cyan,
@@ -3429,11 +3429,11 @@ class _AlertasPageState extends State<AlertasPage> {
         final partes = <String>[];
 
         partes.add(
-          '${nombre.isEmpty ? 'Alguien' : nombre} reportÃ³ un avistamiento de ${mascota.nombre}.',
+          '${nombre.isEmpty ? 'Alguien' : nombre} reportó un avistamiento de ${mascota.nombre}.',
         );
 
         if (telefono.isNotEmpty) {
-          partes.add('TelÃ©fono: $telefono.');
+          partes.add('Teléfono: $telefono.');
         }
 
         if (mensaje.isNotEmpty) {
@@ -3442,7 +3442,7 @@ class _AlertasPageState extends State<AlertasPage> {
 
         if (latitud != null && longitud != null) {
           partes.add(
-            'UbicaciÃ³n: ${latitud.toString()}, ${longitud.toString()}.',
+            'Ubicación: ${latitud.toString()}, ${longitud.toString()}.',
           );
         }
 
@@ -3462,8 +3462,8 @@ class _AlertasPageState extends State<AlertasPage> {
         return _TaggyAlerta(
           tipo: tipo,
           titulo: activado
-              ? 'Modo extravÃ­o activado'
-              : 'Modo extravÃ­o desactivado',
+              ? 'Modo extravío activado'
+              : 'Modo extravío desactivado',
           descripcion: activado
               ? '${mascota.nombre} fue marcada como ${esHembra ? 'extraviada' : 'extraviado'}.'
               : '${mascota.nombre} fue marcada como ${esHembra ? 'encontrada' : 'encontrado'}.',
@@ -3477,10 +3477,10 @@ class _AlertasPageState extends State<AlertasPage> {
       case 'MANIPULACION':
         return _TaggyAlerta(
           tipo: tipo,
-          titulo: 'Posible manipulaciÃ³n',
+          titulo: 'Posible manipulación',
           descripcion: descripcionServidor.isNotEmpty
               ? descripcionServidor
-              : 'El collar de ${mascota.nombre} detectÃ³ una posible manipulaciÃ³n.',
+              : 'El collar de ${mascota.nombre} detectó una posible manipulación.',
           fecha: fecha,
           icono: Icons.shield_outlined,
           color: TaggyColors.red,
@@ -3490,10 +3490,10 @@ class _AlertasPageState extends State<AlertasPage> {
       case 'LOW_BATTERY':
         return _TaggyAlerta(
           tipo: tipo,
-          titulo: 'BaterÃ­a baja',
+          titulo: 'Batería baja',
           descripcion: descripcionServidor.isNotEmpty
               ? descripcionServidor
-              : 'El collar de ${mascota.nombre} reportÃ³ baterÃ­a baja.',
+              : 'El collar de ${mascota.nombre} reportó batería baja.',
           fecha: fecha,
           icono: Icons.battery_alert_rounded,
           color: TaggyColors.orange,
@@ -3503,10 +3503,10 @@ class _AlertasPageState extends State<AlertasPage> {
       case 'LOCATION':
         return _TaggyAlerta(
           tipo: tipo,
-          titulo: 'Nueva ubicaciÃ³n',
+          titulo: 'Nueva ubicación',
           descripcion: descripcionServidor.isNotEmpty
               ? descripcionServidor
-              : 'Se recibiÃ³ una nueva ubicaciÃ³n de ${mascota.nombre}.',
+              : 'Se recibió una nueva ubicación de ${mascota.nombre}.',
           fecha: fecha,
           icono: Icons.location_on_outlined,
           color: TaggyColors.blue,
@@ -3524,7 +3524,7 @@ class _AlertasPageState extends State<AlertasPage> {
               .join(' '),
           descripcion: descripcionServidor.isNotEmpty
               ? descripcionServidor
-              : 'Se registrÃ³ actividad de ${mascota.nombre}.',
+              : 'Se registró actividad de ${mascota.nombre}.',
           fecha: fecha,
           icono: Icons.notifications_outlined,
           color: TaggyColors.blue,
@@ -3568,7 +3568,7 @@ class _AlertasPageState extends State<AlertasPage> {
     }
 
     if (diferencia.inDays < 7) {
-      return 'Hace ${diferencia.inDays} dÃ­as';
+      return 'Hace ${diferencia.inDays} días';
     }
 
     final dia = fecha.day.toString().padLeft(2, '0');
@@ -3622,9 +3622,9 @@ class _AlertasPageState extends State<AlertasPage> {
             if (algunaExtraviada)
               const AlertaCard(
                 icono: Icons.warning_amber_rounded,
-                titulo: 'Modo extravÃ­o activo',
+                titulo: 'Modo extravío activo',
                 descripcion:
-                    'Una de tus mascotas estÃ¡ marcada como extraviada.',
+                    'Una de tus mascotas está marcada como extraviada.',
                 color: TaggyColors.red,
                 tiempo: 'Ahora',
               ),
@@ -3679,7 +3679,7 @@ class _AlertasPageState extends State<AlertasPage> {
                     ),
                     SizedBox(height: 12),
                     Text(
-                      'TodavÃ­a no hay actividad registrada.',
+                      'Todavía no hay actividad registrada.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: TaggyColors.textSecondary),
                     ),
@@ -3878,8 +3878,8 @@ class _PerfilPageState extends State<PerfilPage> {
             ),
             InfoCard(
               icono: Icons.phone_outlined,
-              titulo: 'TelÃ©fono',
-              valor: telefono.isEmpty ? 'Sin telÃ©fono' : telefono,
+              titulo: 'Teléfono',
+              valor: telefono.isEmpty ? 'Sin teléfono' : telefono,
             ),
             InfoCard(
               icono: Icons.notifications_outlined,
@@ -3911,7 +3911,7 @@ class _PerfilPageState extends State<PerfilPage> {
             const InfoCard(
               icono: Icons.security_outlined,
               titulo: 'Seguridad',
-              valor: 'ProtecciÃ³n activa',
+              valor: 'Protección activa',
             ),
             const SizedBox(height: 25),
             SizedBox(
@@ -3924,7 +3924,7 @@ class _PerfilPageState extends State<PerfilPage> {
                 onPressed: cerrarSesion,
                 icon: const Icon(Icons.logout),
                 label: const Text(
-                  'Cerrar sesiÃ³n',
+                  'Cerrar sesión',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -3938,8 +3938,8 @@ class _PerfilPageState extends State<PerfilPage> {
 }
 
 // ======================================================
-// EXTRAVÃO// ======================================================
-// EXTRAVÃO
+// EXTRAVÍO// ======================================================
+// EXTRAVÍO
 // ======================================================
 
 class ExtravioPage extends StatefulWidget {
@@ -3985,7 +3985,7 @@ class _ExtravioPageState extends State<ExtravioPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Modo extravÃ­o')),
+      appBar: AppBar(title: const Text('Modo extravío')),
       body: Padding(
         padding: const EdgeInsets.all(25),
         child: Column(
@@ -4010,8 +4010,8 @@ class _ExtravioPageState extends State<ExtravioPage> {
 
             Text(
               extraviada
-                  ? '${widget.mascota.nombre} estÃ¡ ${widget.mascota.sexo.trim().toLowerCase() == 'hembra' ? 'extraviada' : 'extraviado'}'
-                  : '${widget.mascota.nombre} estÃ¡ ${widget.mascota.sexo.trim().toLowerCase() == 'hembra' ? 'segura' : 'seguro'}',
+                  ? '${widget.mascota.nombre} está ${widget.mascota.sexo.trim().toLowerCase() == 'hembra' ? 'extraviada' : 'extraviado'}'
+                  : '${widget.mascota.nombre} está ${widget.mascota.sexo.trim().toLowerCase() == 'hembra' ? 'segura' : 'seguro'}',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
             ),
@@ -4020,8 +4020,8 @@ class _ExtravioPageState extends State<ExtravioPage> {
 
             Text(
               extraviada
-                  ? 'El perfil pÃºblico mostrarÃ¡ que la mascota estÃ¡ perdida.'
-                  : 'No hay ningÃºn reporte de extravÃ­o activo.',
+                  ? 'El perfil público mostrará que la mascota está perdida.'
+                  : 'No hay ningún reporte de extravío activo.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: TaggyColors.textSecondary),
             ),
@@ -4081,7 +4081,7 @@ class _QrPageState extends State<QrPage> {
     if (widget.mascota.id == null) {
       setState(() {
         cargando = false;
-        error = 'La mascota todavÃ­a no tiene un ID vÃ¡lido.';
+        error = 'La mascota todavía no tiene un ID válido.';
       });
       return;
     }
@@ -4114,7 +4114,7 @@ class _QrPageState extends State<QrPage> {
         : '${ApiService.baseUrl}/api/public/qr/$token.png';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('CÃ³digo QR')),
+      appBar: AppBar(title: const Text('Código QR')),
       body: ListView(
         padding: const EdgeInsets.all(25),
         children: [
@@ -4209,11 +4209,11 @@ class _QrPageState extends State<QrPage> {
                   if (!context.mounted) return;
 
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Enlace pÃºblico copiado')),
+                    const SnackBar(content: Text('Enlace público copiado')),
                   );
                 },
                 icon: const Icon(Icons.copy),
-                label: const Text('Copiar enlace pÃºblico'),
+                label: const Text('Copiar enlace público'),
               ),
             ),
             const SizedBox(height: 12),
@@ -4241,8 +4241,8 @@ class _QrPageState extends State<QrPage> {
 }
 
 // ======================================================
-// PERFIL PÃšBLICO// ======================================================
-// PERFIL PÃšBLICO
+// PERFIL PÚBLICO// ======================================================
+// PERFIL PÚBLICO
 // ======================================================
 
 class PerfilPublicoPage extends StatelessWidget {
@@ -4317,7 +4317,7 @@ class PerfilPublicoPage extends StatelessWidget {
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Avistamiento enviado (simulaciÃ³n).'),
+                    content: Text('Avistamiento enviado (simulación).'),
                   ),
                 );
               },
@@ -4372,7 +4372,7 @@ class _SeguridadPageState extends State<SeguridadPage> {
                 const SizedBox(height: 12),
 
                 Text(
-                  proteccion ? 'ProtecciÃ³n activa' : 'ProtecciÃ³n desactivada',
+                  proteccion ? 'Protección activa' : 'Protección desactivada',
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -4395,8 +4395,8 @@ class _SeguridadPageState extends State<SeguridadPage> {
                 proteccion = value;
               });
             },
-            title: const Text('ProtecciÃ³n antirrobo'),
-            subtitle: const Text('Activa las alertas de manipulaciÃ³n'),
+            title: const Text('Protección antirrobo'),
+            subtitle: const Text('Activa las alertas de manipulación'),
           ),
 
           const SizedBox(height: 12),
@@ -4415,7 +4415,7 @@ class _SeguridadPageState extends State<SeguridadPage> {
 
           const InfoCard(
             icono: Icons.cell_tower,
-            titulo: 'Ãšltima comunicaciÃ³n',
+            titulo: 'Última comunicación',
             valor: 'Hace 30 segundos',
           ),
 
@@ -4706,7 +4706,7 @@ class _MascotaPrincipalCardState extends State<MascotaPrincipalCard> {
         ? '...'
         : gpsActivo
         ? 'Activo'
-        : 'Sin seÃ±al';
+        : 'Sin señal';
 
     final texto4G = cargando
         ? '...'
@@ -4761,7 +4761,7 @@ class _MascotaPrincipalCardState extends State<MascotaPrincipalCard> {
                     const SizedBox(height: 4),
 
                     Text(
-                      '${mascota.raza} â€¢ ${mascota.edad}',
+                      '${mascota.raza} • ${mascota.edad}',
                       style: const TextStyle(color: TaggyColors.textSecondary),
                     ),
 
@@ -4818,7 +4818,7 @@ class _MascotaPrincipalCardState extends State<MascotaPrincipalCard> {
               Expanded(
                 child: MiniStatusCard(
                   icono: Icons.battery_5_bar,
-                  titulo: 'BaterÃ­a',
+                  titulo: 'Batería',
                   valor: textoBateria,
                   color: TaggyColors.cyan,
                 ),
@@ -4872,14 +4872,14 @@ class MascotaListCard extends StatelessWidget {
                     const SizedBox(height: 3),
 
                     Text(
-                      '${mascota.raza} â€¢ ${mascota.edad}',
+                      '${mascota.raza} • ${mascota.edad}',
                       style: const TextStyle(color: TaggyColors.textSecondary),
                     ),
 
                     const SizedBox(height: 7),
 
                     Text(
-                      mascota.extraviada ? 'â— Extraviada' : 'â— Segura',
+                      mascota.extraviada ? '● Extraviada' : '● Segura',
                       style: TextStyle(
                         color: mascota.extraviada
                             ? TaggyColors.red
@@ -5171,7 +5171,7 @@ class StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        extraviada ? 'â— EXTRAVIADA' : 'â— SEGURA',
+        extraviada ? '● EXTRAVIADA' : '● SEGURA',
         style: TextStyle(
           color: color,
           fontSize: 11,
