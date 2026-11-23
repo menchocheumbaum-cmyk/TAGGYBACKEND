@@ -55,7 +55,7 @@ async function cargarMascota() {
         document.getElementById(
             "tipoMascota"
         ).textContent =
-            `${mascota.especie} Â· ${mascota.raza || ""}`;
+            `${mascota.especie} · ${mascota.raza || ""}`;
 
         document.getElementById(
             "sexo"
@@ -71,7 +71,7 @@ async function cargarMascota() {
             "senas"
         ).textContent =
             mascota.senas_particulares ||
-            "Sin informaciÃ³n";
+            "Sin información";
 
         document.getElementById(
             "propietario"
@@ -137,13 +137,13 @@ btnUbicacion.addEventListener("click", () => {
     if (!navigator.geolocation) {
 
         estadoUbicacion.textContent =
-            "Tu navegador no permite obtener la ubicaciÃ³n.";
+            "Tu navegador no permite obtener la ubicación.";
 
         return;
     }
 
     estadoUbicacion.textContent =
-        "Obteniendo ubicaciÃ³n...";
+        "Obteniendo ubicación...";
 
     navigator.geolocation.getCurrentPosition(
 
@@ -159,7 +159,7 @@ btnUbicacion.addEventListener("click", () => {
                 position.coords.accuracy;
 
             estadoUbicacion.textContent =
-                "âœ… UbicaciÃ³n obtenida correctamente";
+                "✅ Ubicación obtenida correctamente";
         },
 
         (error) => {
@@ -167,7 +167,7 @@ btnUbicacion.addEventListener("click", () => {
             console.error(error);
 
             estadoUbicacion.textContent =
-                "No fue posible obtener tu ubicaciÃ³n. Puedes enviar el reporte sin ella.";
+                "No fue posible obtener tu ubicación. Puedes enviar el reporte sin ella.";
         },
 
         {
@@ -248,7 +248,7 @@ formulario.addEventListener("submit", async (event) => {
         }
 
         resultadoAvistamiento.textContent =
-            "âœ… Avistamiento enviado correctamente";
+            "✅ Avistamiento enviado correctamente";
 
         formulario.reset();
 
@@ -265,6 +265,6 @@ formulario.addEventListener("submit", async (event) => {
         console.error(error);
 
         resultadoAvistamiento.textContent =
-            "âŒ No se pudo enviar el avistamiento";
+            "❌ No se pudo enviar el avistamiento";
     }
 });
