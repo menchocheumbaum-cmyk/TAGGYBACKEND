@@ -15,7 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:video_player/video_player.dart';
+import 'taggy_entrada.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -252,103 +252,12 @@ class TaggyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'TAGGY',
       theme: TaggyTheme.light,
-      home: const IntroVideoPage(),
+      home: const TaggyEntrada(destino: AuthGate()),
     );
   }
 }
 // ======================================================
 // CONTROL DE SESIÃ“N
-// ======================================================
-
-class IntroVideoPage extends StatefulWidget {
-  const IntroVideoPage({super.key});
-
-  @override
-  State<IntroVideoPage> createState() => _IntroVideoPageState();
-}
-
-class _IntroVideoPageState extends State<IntroVideoPage> {
-  VideoPlayerController? _controller;
-  bool _listo = false;
-  bool _terminado = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _iniciarIntro();
-  }
-
-  Future<void> _iniciarIntro() async {
-    try {
-      final controller = VideoPlayerController.asset(
-        'assets/video/taggy_intro_3s.mp4',
-      );
-
-      _controller = controller;
-
-      await controller.initialize();
-      await controller.setVolume(0);
-      await controller.setLooping(false);
-
-      if (!mounted) return;
-
-      setState(() {
-        _listo = true;
-      });
-
-      await controller.play();
-
-      await Future.delayed(const Duration(seconds: 3));
-
-      _entrarApp();
-    } catch (e) {
-      debugPrint('Error cargando intro TAGGY: $e');
-
-      await Future.delayed(const Duration(seconds: 1));
-
-      _entrarApp();
-    }
-  }
-
-  void _entrarApp() {
-    if (!mounted || _terminado) return;
-
-    _terminado = true;
-
-    Navigator.of(context)
-        .pushReplacement(MaterialPageRoute(builder: (_) => const AuthGate()));
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = _controller;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SizedBox.expand(
-        child: _listo && controller != null && controller.value.isInitialized
-            ? FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: controller.value.size.width,
-                  height: controller.value.size.height,
-                  child: VideoPlayer(controller),
-                ),
-              )
-            : const ColoredBox(color: Colors.black),
-      ),
-    );
-  }
-}
-
-// ======================================================
-// CONTROL DE SESION
 // ======================================================
 
 class AuthGate extends StatefulWidget {
