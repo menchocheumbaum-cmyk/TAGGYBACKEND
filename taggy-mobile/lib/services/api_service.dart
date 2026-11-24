@@ -179,6 +179,7 @@ class ApiService {
     String? raza,
     String? sexo,
     String? color,
+    String? senasParticulares,
     String? fotoUrl,
   }) async {
     final response = await http.post(
@@ -190,6 +191,7 @@ class ApiService {
         'raza': raza,
         'sexo': sexo,
         'color': color,
+        'senas_particulares': senasParticulares,
         'foto_url': fotoUrl,
       }),
     );
@@ -247,6 +249,7 @@ class ApiService {
     String? raza,
     String? sexo,
     String? color,
+    String? senasParticulares,
     String? fotoUrl,
   }) async {
     final response = await http.put(
@@ -258,6 +261,7 @@ class ApiService {
         'raza': raza,
         'sexo': sexo,
         'color': color,
+        'senas_particulares': senasParticulares,
         'foto_url': fotoUrl,
       }),
     );

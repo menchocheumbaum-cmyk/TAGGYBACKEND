@@ -39,6 +39,7 @@ class Mascota {
   String sexo;
   String color;
   String peso;
+  String senasParticulares;
   String idTaggy;
   bool extraviada;
   String? imagenPath;
@@ -52,6 +53,7 @@ class Mascota {
     required this.sexo,
     required this.color,
     required this.peso,
+    this.senasParticulares = '',
     required this.idTaggy,
     this.extraviada = false,
     this.imagenPath,
@@ -66,6 +68,7 @@ class Mascota {
     String? sexo,
     String? color,
     String? peso,
+    String? senasParticulares,
     String? idTaggy,
     bool? extraviada,
     String? imagenPath,
@@ -79,6 +82,7 @@ class Mascota {
       sexo: sexo ?? this.sexo,
       color: color ?? this.color,
       peso: peso ?? this.peso,
+      senasParticulares: senasParticulares ?? this.senasParticulares,
       idTaggy: idTaggy ?? this.idTaggy,
       extraviada: extraviada ?? this.extraviada,
       imagenPath: imagenPath ?? this.imagenPath,
@@ -95,6 +99,7 @@ class Mascota {
       'sexo': sexo,
       'color': color,
       'peso': peso,
+      'senas_particulares': senasParticulares,
       'idTaggy': idTaggy,
       'extraviada': extraviada,
       'imagenPath': imagenPath,
@@ -114,6 +119,7 @@ class Mascota {
       sexo: json['sexo']?.toString() ?? '',
       color: json['color']?.toString() ?? '',
       peso: json['peso']?.toString() ?? '',
+      senasParticulares: json['senas_particulares']?.toString() ?? '',
       idTaggy:
           json['device_uid']?.toString() ??
           json['idTaggy']?.toString() ??
@@ -776,6 +782,7 @@ class _HomePageState extends State<HomePage> {
         raza: mascota.raza,
         sexo: mascota.sexo,
         color: mascota.color,
+        senasParticulares: mascota.senasParticulares,
         fotoUrl: mascota.imagenPath,
       );
 
@@ -819,6 +826,7 @@ class _HomePageState extends State<HomePage> {
         raza: mascotaActualizada.raza,
         sexo: mascotaActualizada.sexo,
         color: mascotaActualizada.color,
+        senasParticulares: mascotaActualizada.senasParticulares,
         fotoUrl: mascotaActualizada.imagenPath,
       );
 
@@ -1407,6 +1415,7 @@ class _AgregarMascotaPageState extends State<AgregarMascotaPage> {
   final colorController = TextEditingController();
 
   final pesoController = TextEditingController();
+  final senasController = TextEditingController();
 
   String especie = 'Perro';
   String sexo = 'Macho';
@@ -1441,6 +1450,7 @@ class _AgregarMascotaPageState extends State<AgregarMascotaPage> {
       sexo: sexo,
       color: colorController.text.trim(),
       peso: pesoController.text.trim(),
+      senasParticulares: senasController.text.trim(),
       idTaggy: 'TAGGY-$codigo',
       imagenPath: imagenPath,
     );
@@ -1455,6 +1465,7 @@ class _AgregarMascotaPageState extends State<AgregarMascotaPage> {
     edadController.dispose();
     colorController.dispose();
     pesoController.dispose();
+    senasController.dispose();
 
     super.dispose();
   }
@@ -1610,6 +1621,20 @@ class _AgregarMascotaPageState extends State<AgregarMascotaPage> {
               label: 'Peso',
               hint: 'Ejemplo: 28 kg',
               icono: Icons.monitor_weight_outlined,
+            ),
+
+            const SizedBox(height: 15),
+
+            TextFormField(
+              controller: senasController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Se\u00f1as particulares',
+                hintText: 'Ejemplo: Mancha blanca en el pecho',
+                helperText: 'Opcional. Visible en el perfil QR.',
+                prefixIcon: Icon(Icons.description_outlined),
+                alignLabelWithHint: true,
+              ),
             ),
 
             const SizedBox(height: 30),
@@ -1802,6 +1827,12 @@ class _DetalleMascotaPageState extends State<DetalleMascotaPage> {
           ),
 
           InfoCard(
+            icono: Icons.description_outlined,
+            titulo: 'Se\u00f1as particulares',
+            valor: valorSeguro(mascota.senasParticulares),
+          ),
+
+          InfoCard(
             icono: Icons.badge,
             titulo: 'ID TAGGY',
             valor: mascota.idTaggy,
@@ -1876,6 +1907,7 @@ class _EditarMascotaPageState extends State<EditarMascotaPage> {
   late TextEditingController edadController;
   late TextEditingController colorController;
   late TextEditingController pesoController;
+  late TextEditingController senasController;
 
   late String especie;
   late String sexo;
@@ -1894,6 +1926,9 @@ class _EditarMascotaPageState extends State<EditarMascotaPage> {
     colorController = TextEditingController(text: widget.mascota.color);
 
     pesoController = TextEditingController(text: widget.mascota.peso);
+    senasController = TextEditingController(
+      text: widget.mascota.senasParticulares,
+    );
 
     especie = widget.mascota.especie.isEmpty ? 'Perro' : widget.mascota.especie;
 
@@ -1927,6 +1962,7 @@ class _EditarMascotaPageState extends State<EditarMascotaPage> {
       sexo: sexo,
       color: colorController.text.trim(),
       peso: pesoController.text.trim(),
+      senasParticulares: senasController.text.trim(),
       imagenPath: imagenPath,
     );
 
@@ -1940,6 +1976,7 @@ class _EditarMascotaPageState extends State<EditarMascotaPage> {
     edadController.dispose();
     colorController.dispose();
     pesoController.dispose();
+    senasController.dispose();
 
     super.dispose();
   }
@@ -2081,6 +2118,20 @@ class _EditarMascotaPageState extends State<EditarMascotaPage> {
               controller: pesoController,
               label: 'Peso',
               icono: Icons.monitor_weight_outlined,
+            ),
+
+            const SizedBox(height: 15),
+
+            TextFormField(
+              controller: senasController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Se\u00f1as particulares',
+                hintText: 'Ejemplo: Mancha blanca en el pecho',
+                helperText: 'Opcional. Visible en el perfil QR.',
+                prefixIcon: Icon(Icons.description_outlined),
+                alignLabelWithHint: true,
+              ),
             ),
 
             const SizedBox(height: 30),
